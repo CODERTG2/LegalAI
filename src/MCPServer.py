@@ -11,16 +11,15 @@ dsclient = DeepSeekClient()
 def search(query: str):
     # TODO: just combine everything together here.
     context = []
-    for domain in choose_domain(query):
-        match domain:
-            case "Congressional Bills":
-                context.append(for doc in get_congressional_bills(query))
-            case "Executive Orders":
-                context.append(for doc in get_executive_orders(query))
-            case "Supreme Court Decisions":
-                context.append(for doc in get_supreme_court_decisions(query))
-            case "News Articles":
-                context.append(for doc in get_news_articles(query))
+    domains = choose_domain(query)
+    if "Congressional Bills" in domains:
+        context.append(for doc in get_congressional_bills(query))
+    if "Executive Orders" in domains:
+        context.append(for doc in get_executive_orders(query))
+    if "Supreme Court Decisions" in domains:
+        context.append(for doc in get_supreme_court_decisions(query))
+    if "News Articles" in domains:
+        context.append(for doc in get_news_articles(query))
     
     response = dsclient.chat(
         f"""Answer the following query using the provided context:
@@ -47,7 +46,8 @@ def choose_domain(query: str):
 
         Query: {query}
         Answer:
-        """)
+        """
+    )
 
 @mcp.tool()
 def get_congressional_bills(query: str):
