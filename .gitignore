@@ -1,3 +1,8 @@
 .env
 /.venv
 /scripts/*.json
+/scripts/BILLS/*.json
+/scripts/COURT_OPINIONS/*.json
+/scripts/EXECUTIVE_ORDERS/*.json
+/scripts/EXECUTIVE_ORDERS/*.csv
+/src/assets/
