@@ -4,35 +4,33 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-class DeepSeekClient:
-    """Client for DeepSeek R1 via OpenRouter API."""
+class GroqClient:
+    """Client for Llama 3.3 via Groq API."""
     
     def __init__(self, api_key=None):
-        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        self.api_key = api_key or os.getenv("GROQ_API_KEY")
         if not self.api_key:
-            raise ValueError("OPENROUTER_API_KEY environment variable is required")
+            raise ValueError("GROQ_API_KEY environment variable is required")
         
-        self.base_url = "https://openrouter.ai/api/v1"
-        self.model = "tngtech/deepseek-r1t-chimera:free"
+        self.base_url = "https://api.groq.com/openai/v1"
+        self.model = "llama-3.3-70b-versatile"
     
     def chat(self, messages, model=None):
         """
-        Send a chat completion request to DeepSeek R1 via OpenRouter.
+        Send a chat completion request to Groq.
         
         Args:
             messages: List of message dicts with 'role' and 'content'
-            model: Optional model override (defaults to deepseek/deepseek-r1)
+            model: Optional model override
             
         Returns:
-            Dict with response in format: {"message": {"content": "response text"}}
+            String response content
         """
         url = f"{self.base_url}/chat/completions"
         
         headers = {
             "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/CODERTG2/LegalAI",
-            "X-Title": "LegalAI"
+            "Content-Type": "application/json"
         }
         
         if isinstance(messages, str):
@@ -51,4 +49,4 @@ class DeepSeekClient:
             
             return data["choices"][0]["message"]["content"]
         except requests.exceptions.RequestException as e:
-            raise Exception(f"OpenRouter API request failed: {e}")
+            raise Exception(f"Groq API request failed: {e}")

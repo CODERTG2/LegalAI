@@ -2,7 +2,7 @@ import os
 import requests
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
-from DeepSeekClient import DeepSeekClient
+from LLMClient import GroqClient
 from util import cosine_similarity
 import numpy as np
 
@@ -19,7 +19,7 @@ class NewsClient:
         self.multi_queries = None
         self.model = model
         self.query_embedding = np.array(query_embedding).flatten()
-        self.deepseek_client = DeepSeekClient()
+        self.llm_client = GroqClient()
     
     def query_processing(self):
         prompt = f"""
@@ -36,7 +36,7 @@ class NewsClient:
         Example Query: "Who won the best actor Oscar in 2023?"
         Example Output: best actor Oscar 2023
         """
-        output = self.deepseek_client.chat(
+        output = self.llm_client.chat(
             messages=[
                 {"role": "system", "content": "You are an expert in breaking down queries into search terms."},
                 {"role": "user", "content": prompt}

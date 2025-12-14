@@ -1,3 +1,3 @@
 import MCPServer
 
-print(MCPServer.search("Summarize the tariff chaos that happened."))
+print(MCPServer.search("Has Congress done anything about its authority over tarrifs or taxes?"))

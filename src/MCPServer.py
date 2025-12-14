@@ -13,14 +13,14 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 
 from BillClient import BillClient
-from DeepSeekClient import DeepSeekClient
+from LLMClient import GroqClient
 from NewsClient import NewsClient
 from OrderClient import OrderClient
 from OpinionClient import OpinionClient
 from util import cosine_similarity
 
 mcp = FastMCP("LegalAI")
-dsclient = DeepSeekClient()
+dsclient = GroqClient()
 bills = BillClient()
 orders = OrderClient()
 opinions = OpinionClient()
@@ -33,6 +33,8 @@ except:
 def search(query: str):
     context = []
     domains = choose_domain(query)
+    print(domains)
+
     query_embedding = np.array(model.encode(f"search_query: {query}"), dtype=np.float32).reshape(1,-1)
     norm_qe = query_embedding/np.linalg.norm(query_embedding)
     
@@ -60,19 +62,19 @@ def search(query: str):
         except Exception as e:
             print(f"ERROR: Failed to search News Articles: {e}")
     
-    context.sort(key=lambda item: item['distance'], reverse=True)
+    context.sort(key=lambda item: item['distance'], reverse=False)
     
     best_context = context[:5]
+    formatted_context = format_context(best_context)
 
     response = dsclient.chat(
         f"""Answer the following query using the provided context. Make sure to cite any sources you are using.
-        If you cannot answer the query using the provided context, respond with "I cannot respond to this query based on the provided context. Please try again or ask a different question."
         Query: {query}
-        Context: {format_context(best_context)}
+        Context: {formatted_context}
         Answer:"""
     )
     
-    return response if verify(query, query_embedding, best_context, format_context(best_context), response) else "I cannot respond to this query based on the provided context. Please try again or ask a different question."
+    return response if verify(query, query_embedding, best_context, formatted_context, response) else "I cannot respond to this query based on the provided context. Please try again or ask a different question."
 
 @mcp.tool()
 def choose_domain(query: str):
