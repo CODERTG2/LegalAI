@@ -13,7 +13,7 @@ class DeepSeekClient:
             raise ValueError("OPENROUTER_API_KEY environment variable is required")
         
         self.base_url = "https://openrouter.ai/api/v1"
-        self.model = "deepseek/deepseek-r1"
+        self.model = "tngtech/deepseek-r1t-chimera:free"
     
     def chat(self, messages, model=None):
         """
@@ -30,9 +30,14 @@ class DeepSeekClient:
         
         headers = {
             "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/CODERTG2/LegalAI",
+            "X-Title": "LegalAI"
         }
         
+        if isinstance(messages, str):
+            messages = [{"role": "user", "content": messages}]
+            
         payload = {
             "model": model or self.model,
             "messages": messages,

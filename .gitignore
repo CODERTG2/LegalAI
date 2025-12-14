@@ -6,3 +6,4 @@
 /scripts/EXECUTIVE_ORDERS/*.json
 /scripts/EXECUTIVE_ORDERS/*.csv
 /src/assets/
+/src/__pycache__

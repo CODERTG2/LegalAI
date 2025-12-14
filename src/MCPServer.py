@@ -1,3 +1,8 @@
+import os
+# Fix for FAISS/Torch OpenMP conflict on macOS
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 import logging
 from mcp.server.fastmcp import FastMCP
 from typing import List
@@ -5,6 +10,7 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from sentence_transformers import SentenceTransformer
+import numpy as np
 
 from BillClient import BillClient
 from DeepSeekClient import DeepSeekClient
@@ -18,34 +24,55 @@ dsclient = DeepSeekClient()
 bills = BillClient()
 orders = OrderClient()
 opinions = OpinionClient()
-model = SentenceTransformer("nomic-ai/nomic-embed-text-v1.5", trust_remote_code=True)
+try:
+    model = SentenceTransformer("src/assets/model", trust_remote_code=True)
+except:
+    model = SentenceTransformer("nomic-ai/nomic-embed-text-v1.5", trust_remote_code=True)
 
 @mcp.tool()
 def search(query: str):
-    # TODO: just combine everything together here.
     context = []
     domains = choose_domain(query)
-    query_embedding = model.encode(f"search_query: {query}")
+    query_embedding = np.array(model.encode(f"search_query: {query}"), dtype=np.float32).reshape(1,-1)
+    norm_qe = query_embedding/np.linalg.norm(query_embedding)
+    
     if "Congressional Bills" in domains:
-        context.append(for doc in get_congressional_bills(query_embedding))
-    if "Executive Orders" in domains:
-        context.append(for doc in get_executive_orders(query_embedding))
-    if "Supreme Court Decisions" in domains:
-        context.append(for doc in get_supreme_court_decisions(query, query_embedding))
-    if "News Articles" in domains:
-        context.append(for doc in get_news_articles(query))
+        try:
+            context.extend(bills.search_congressional_bills(norm_qe))
+        except Exception as e:
+            print(f"ERROR: Failed to search Congressional Bills: {e}")
 
-    best_context = context.sort(key=lambda item: item['distance'])[:5]
+    if "Executive Orders" in domains:
+        try:
+            context.extend(orders.search_executive_orders(norm_qe))
+        except Exception as e:
+            print(f"ERROR: Failed to search Executive Orders: {e}")
+
+    if "Supreme Court Decisions" in domains:
+        try:
+            context.extend(opinions.search_supreme_court_decisions(norm_qe))
+        except Exception as e:
+            print(f"ERROR: Failed to search Supreme Court Decisions: {e}")
+
+    if "News Articles" in domains:
+        try:
+            context.extend(get_news_articles(query, norm_qe))
+        except Exception as e:
+            print(f"ERROR: Failed to search News Articles: {e}")
+    
+    context.sort(key=lambda item: item['distance'], reverse=True)
+    
+    best_context = context[:5]
 
     response = dsclient.chat(
         f"""Answer the following query using the provided context. Make sure to cite any sources you are using.
         If you cannot answer the query using the provided context, respond with "I cannot respond to this query based on the provided context. Please try again or ask a different question."
         Query: {query}
-        Context: {best_context}
+        Context: {format_context(best_context)}
         Answer:"""
     )
     
-    return response if verify(query, query_embedding, context, format_context(context), response) else "I cannot respond to this query based on the provided context. Please try again or ask a different question."
+    return response if verify(query, query_embedding, best_context, format_context(best_context), response) else "I cannot respond to this query based on the provided context. Please try again or ask a different question."
 
 @mcp.tool()
 def choose_domain(query: str):
@@ -65,34 +92,20 @@ def choose_domain(query: str):
         """
     )
 
-@mcp.tool()
-def get_congressional_bills(query_embedding):
-    embedding = np.array(query_embedding, dtype=np.float32).reshape(1, -1)
-    return bills.search_congressional_bills(embedding/np.linalg.norm(embedding))
 
 @mcp.tool()
-def get_executive_orders(query_embedding):
-    embedding = np.array(query_embedding, dtype=np.float32).reshape(1, -1)
-    return orders.search_congressional_bills(embedding/np.linalg.norm(embedding))
-
-
-@mcp.tool()
-def get_supreme_court_decisions(query_embedding):
-    embedding = np.array(query_embedding, dtype=np.float32).reshape(1, -1)
-    return opinions.search_congressional_bills(embedding/np.linalg.norm(embedding))
-
-@mcp.tool()
-def get_news_articles(query: str, querry_embedding):
-    news = NewsClient(query, querry_embedding, dsclient)
+def get_news_articles(query: str, query_embedding):
+    news = NewsClient(query, query_embedding, dsclient)
     keywords = news.query_processing()
-    context = []
+    
+    found_articles = []
 
     for keyword in keywords:
         articles = news.get_best_articles(keyword, count=5)
         if articles:
-            context.extend(articles)
+            found_articles.extend(articles)
 
-    if not context:
+    if not found_articles:
         try:
             nltk.data.find('corpora/stopwords')
         except nltk.downloader.DownloadError:
@@ -105,25 +118,43 @@ def get_news_articles(query: str, querry_embedding):
             query_chunk = ' '.join(filtered_words[i:i+2])
             articles = news.get_best_articles(query_chunk, count=5)
             if articles:
-                context.extend(articles)
+                found_articles.extend(articles)
         
-        if not context:
+        if not found_articles:
             filtered_sentence = ' '.join(filtered_words)
             articles = news.get_best_articles(filtered_sentence, count=5)
             if articles:
-                context.extend(articles)
+                found_articles.extend(articles)
             else:
-                return "No relevant news articles were found."
+                return [{
+                    "chunk": {
+                        "body": "No relevant news articles were found.",
+                        "title": "System Message",
+                        "date": "N/A"
+                    },
+                    "distance": 0
+                }]
     
-    for article in articles:
+    seen_uris = set()
+    unique_articles = []
+    for art in found_articles:
+        uri = art.get('uri')
+        if uri and uri not in seen_uris:
+            seen_uris.add(uri)
+            unique_articles.append(art)
+        elif not uri:
+            unique_articles.append(art)
+
+    context = []
+    for article in unique_articles:
         context.extend(news.chunking(article, model))
     
     return context
 
 @mcp.tool()
 def verify(query, query_embedding, documents, formatted_context, response):
-    vector_guardrail_1 = documents[0]["distance"] >= 0.5
-    vector_guardrail_2 = cosine_similarity(querry_embedding, model.encode(response)) >= 0.5
+    vector_guardrail_1 = documents[0]["distance"] <= 0.7
+    vector_guardrail_2 = cosine_similarity(query_embedding, model.encode(response)) <= 0.5
     deepseek_guardrail = "false" in dsclient.chat(
         f"""Is the response generated not based in context or not answering the question? Only say 'true' or 'false'.
         
@@ -138,11 +169,74 @@ def verify(query, query_embedding, documents, formatted_context, response):
         """
     )
 
+    if deepseek_guardrail & (vector_guardrail_1 | vector_guardrail_2):
+        return True
+    elif vector_guardrail_1 & vector_guardrail_2:
+        return True
+    else:
+        return False
+
+    print(f"guardrail 1: {vector_guardrail_1}, 2: {vector_guardrail_2}, deepseek: {deepseek_guardrail}")
+
     return vector_guardrail_1 & vector_guardrail_2 & deepseek_guardrail
 
-def format_context():
-    # TODO: format context
-    pass
+def format_context(context: List[dict]) -> str:
+    formatted_context = []
+    
+    for item in context:
+        chunk = item.get('chunk', {})
+        
+        # Congressional Bill
+        if 'congress' in chunk and 'number' in chunk:
+            title = chunk.get('title', 'Unknown Bill')
+            congress = chunk.get('congress', 'Unknown')
+            number = chunk.get('number', 'Unknown')
+            latest_action = chunk.get('latestAction', {})
+            action_text = latest_action.get('text', 'No action text')
+            action_date = latest_action.get('actionDate', 'Unknown Date')
+            
+            entry = f"Congressional Bill: {title} ({congress}th Congress, H.R. {number})\n" \
+                    f"Date: {action_date}\n" \
+                    f"Latest Action: {action_text}"
+            formatted_context.append(entry)
+            
+        # Executive Order
+        elif 'order_number' in chunk and 'signing_date' in chunk:
+            title = chunk.get('title', 'Unknown Order')
+            date = chunk.get('signing_date', 'Unknown Date')
+            chunk_text_obj = chunk.get('chunk_text', {})
+            text = chunk_text_obj.get('text', '') if isinstance(chunk_text_obj, dict) else str(chunk_text_obj)
+            
+            entry = f"Executive Order: {title} ({date})\n" \
+                    f"Text: {text}"
+            formatted_context.append(entry)
+            
+        # Supreme Court Opinion
+        elif 'resource_uri' in chunk and 'text' in chunk:
+            date = chunk.get('date_created', 'Unknown Date')
+            text = chunk.get('text', '')
+            url = chunk.get('absolute_url', '')
+            
+            entry = f"Supreme Court Decision ({date})\n" \
+                    f"URL: {url}\n" \
+                    f"Text: {text}"
+            formatted_context.append(entry)
+            
+        # News Article
+        elif 'body' in chunk and 'title' in chunk:
+            title = chunk.get('title', 'Unknown Title')
+            body = chunk.get('body', '')
+            date = chunk.get('date', 'Unknown Date') # Assuming date field exists, defaulting if not
+            
+            entry = f"News Article: {title} ({date})\n" \
+                    f"Content: {body}"
+            formatted_context.append(entry)
+            
+        else:
+            # Fallback for unknown types
+            formatted_context.append(f"Unknown Source: {str(chunk)}")
+            
+    return "\n\n".join(formatted_context)
 
 if __name__ == "__main__":
     logging.info("Starting MCP server...")

@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 from dotenv import load_dotenv
 from DeepSeekClient import DeepSeekClient
 from util import cosine_similarity
+import numpy as np
 
 load_dotenv()
 
@@ -17,6 +18,7 @@ class NewsClient:
         self.query = query
         self.multi_queries = None
         self.model = model
+        self.query_embedding = np.array(query_embedding).flatten()
         self.deepseek_client = DeepSeekClient()
     
     def query_processing(self):
@@ -34,13 +36,13 @@ class NewsClient:
         Example Query: "Who won the best actor Oscar in 2023?"
         Example Output: best actor Oscar 2023
         """
-        response = self.deepseek_client.chat(
+        output = self.deepseek_client.chat(
             messages=[
                 {"role": "system", "content": "You are an expert in breaking down queries into search terms."},
                 {"role": "user", "content": prompt}
             ]
         )
-        output = response["message"]["content"]
+        
         self.multi_queries = output.split('\n')
         if len(self.multi_queries) > 3:
             self.multi_queries = self.multi_queries[:3]
@@ -99,11 +101,11 @@ class NewsClient:
             sort_by="rel"
         )
     
-    def chunking(article, model, sentences_per_chunk=5):
+    def chunking(self, article, model, sentences_per_chunk=5):
         """Set sentence chunking for articles."""
-        text = article["body"]
+        text = article.get("body", "")
         sentences = text.split(". ")
-        context = []
+        chunks = []
         for i in range(0, len(sentences), sentences_per_chunk):
             chunk_sentences = sentences[i:i + sentences_per_chunk]
             chunk_text = ". ".join(chunk_sentences)
@@ -118,7 +120,7 @@ class NewsClient:
 
             chunks.append({
                 "chunk": chunk_dict,
-                "distance": cosine_similarity(chunk_dict["embedding"], self.query_embedding)
+                "distance": float(cosine_similarity(chunk_dict["embedding"], self.query_embedding))
             })
         
         return chunks

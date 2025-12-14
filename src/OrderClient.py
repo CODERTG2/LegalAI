@@ -8,16 +8,13 @@ class OrderClient:
             self.chunks = json.load(f)
 
     def search_executive_orders(self, query_embedding):
-        if query_embedding.shape[1] != self.index.d:
-            raise Exception("Query embedding dimension must match index dimension")
-
         D, I = self.index.search(query_embedding, k=5)
 
         context = []
-        for d, i in D, I:
+        for d, i in zip(D[0], I[0]):
             context.append({
-                "chunk": self.chunks[i]
-                "distance" = d
+                "chunk": self.chunks[i],
+                "distance": d
             })
         
         return context
