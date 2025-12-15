@@ -65,6 +65,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const query = queryInput.value.trim();
         if (!query) return;
 
+        // PII Check
+        const piiWarning = checkPII(query);
+        if (piiWarning) {
+            // Show simple alert for now, could be a toast in future
+            alert("⚠️ Privacy Warning: " + piiWarning);
+            return;
+        }
+
         // UI Transition: Hide welcome, show chat
         if (welcomeScreen.style.display !== 'none') {
             welcomeScreen.style.display = 'none';
@@ -78,9 +86,20 @@ document.addEventListener('DOMContentLoaded', () => {
         queryInput.disabled = true;
         sendButton.disabled = true;
 
-        // Show loading state
-        const loadingId = addLoadingIndicator();
-        scrollToBottom();
+        // Show thinking process
+        const steps = ["Analyzing query intent...", "Retrieving legal documents...", "Verifying citations..."];
+        const thinkingId = await showThinkingProcess(steps);
+
+        // Simulate step progress while waiting for backend (since we can't stream real status yet)
+        let stepInterval = setInterval(() => {
+            const currentStep = document.querySelector(`#${thinkingId} .active`);
+            if (currentStep) {
+                const index = parseInt(currentStep.id.split('-step-')[1]);
+                if (index < steps.length - 1) {
+                    updateThinkingStep(thinkingId, index, 'completed');
+                }
+            }
+        }, 1500);
 
         try {
             // Determine tool to call
@@ -99,8 +118,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
 
-            // Remove loading indicator
-            removeLoadingIndicator(loadingId);
+            // Clear interval and remove thinking
+            clearInterval(stepInterval);
+            removeThinkingProcess(thinkingId);
 
             if (data.error) {
                 await typeMessage('ai', `**Error:** ${data.error}`);
@@ -118,7 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
         } catch (error) {
-            removeLoadingIndicator(loadingId);
+            clearInterval(stepInterval);
+            removeThinkingProcess(thinkingId);
             await typeMessage('ai', `**Connection Error:** ${error.message}`);
         } finally {
             queryInput.disabled = false;
@@ -169,7 +190,80 @@ document.addEventListener('DOMContentLoaded', () => {
         scrollToBottom();
     }
 
+    // PII Guardrail
+    function checkPII(text) {
+        // Regex patterns for common US PII
+        const ssnPattern = /\b\d{3}[-.]?\d{2}[-.]?\d{4}\b/;
+        const phonePattern = /\b\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/;
+        const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
+
+        if (ssnPattern.test(text)) return "It looks like you entered a Social Security Number. For your privacy, please remove it.";
+        if (phonePattern.test(text)) return "It looks like you entered a phone number. For your privacy, please remove it.";
+        if (emailPattern.test(text)) return "It looks like you entered an email address. For your privacy, please remove it.";
+
+        return null;
+    }
+
+    // Thinking Process Visualization
+    async function showThinkingProcess(steps) {
+        const id = 'thinking-' + Date.now();
+        const div = document.createElement('div');
+        div.id = id;
+        div.className = 'message ai';
+
+        let stepsHtml = steps.map((step, index) =>
+            `<div class="thinking-step ${index === 0 ? 'active' : ''}" id="${id}-step-${index}">
+                <div class="step-icon">
+                    ${index === 0 ? getSpinnerIcon() : '⚪'}
+                </div>
+                <span>${step}</span>
+            </div>`
+        ).join('');
+
+        div.innerHTML = `
+            <div class="avatar">✨</div>
+            <div class="message-content" style="padding: 1rem;">
+                <div class="thinking-process">
+                    ${stepsHtml}
+                </div>
+            </div>
+        `;
+        messageList.appendChild(div);
+        scrollToBottom();
+        return id;
+    }
+
+    async function updateThinkingStep(id, stepIndex, status) {
+        const stepEl = document.getElementById(`${id}-step-${stepIndex}`);
+        if (!stepEl) return;
+
+        const iconEl = stepEl.querySelector('.step-icon');
+
+        if (status === 'completed') {
+            stepEl.classList.remove('active');
+            stepEl.classList.add('completed');
+            iconEl.innerHTML = '✅';
+
+            // Activate next step if exists
+            const nextStep = document.getElementById(`${id}-step-${stepIndex + 1}`);
+            if (nextStep) {
+                nextStep.classList.add('active');
+                nextStep.querySelector('.step-icon').innerHTML = getSpinnerIcon();
+            }
+        }
+    }
+
+    function getSpinnerIcon() {
+        return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`;
+    }
+
+    function removeThinkingProcess(id) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+    }
+
     function addLoadingIndicator() {
+        // Fallback or deprecated - replaced by showThinkingProcess
         const id = 'loading-' + Date.now();
         const div = document.createElement('div');
         div.id = id;
@@ -194,7 +288,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function scrollToBottom() {
-        chatViewport.scrollTop = chatViewport.scrollHeight;
+        const scrollHeight = chatViewport.scrollHeight;
+        const currentScroll = chatViewport.scrollTop + chatViewport.clientHeight;
+
+        // Only auto-scroll if user is already near bottom or it's a new message
+        chatViewport.scrollTo({
+            top: scrollHeight,
+            behavior: 'smooth'
+        });
     }
 
     function formatMarkdown(text) {

@@ -451,3 +451,73 @@ body::before {
         transform: scale(1);
     }
 }
+
+/* Privacy Note */
+.privacy-note {
+    position: absolute;
+    bottom: -30px;
+    width: 100%;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.input-wrapper {
+    /* Ensure input wrapper handles the absolute footer */
+    position: relative;
+    padding-bottom: 2.5rem;
+}
+
+/* Thinking Process Visualization */
+.thinking-process {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+}
+
+.thinking-step {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    opacity: 0.4;
+    transition: all 0.3s ease;
+}
+
+.thinking-step.active {
+    opacity: 1;
+    color: #a855f7;
+    /* Primary purple */
+    font-weight: 500;
+}
+
+.thinking-step.completed {
+    opacity: 0.8;
+    color: #4ade80;
+    /* Success green */
+}
+
+.step-icon {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.thinking-step.active .step-icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

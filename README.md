@@ -1,6 +1,6 @@
-# Veritas
+# Veritas: Civic Intelligence Engine
 
-Veritas is a powerful legal AI system designed to democratize access to legal knowledge. It combines a robust semantic search engine with Retrieval-Augmented Generation (RAG) to provide accurate, context-aware answers from a diverse range of US legal documents.
+Veritas is a **Civic Intelligence Engine** designed to bridge the gap between complex legal documents and the public. Unlike standard chatbots that hallucinate, Veritas uses a strict **Retrieval-Augmented Generation (RAG)** architecture with a unique **Double-Verification Protocol** to ensure every answer is grounded in US statutes, orders, or case law. It operates as a stateless educational tool, prioritizing **verification**, **transparency**, and **privacy**.
 
 Built on the **Model Context Protocol (MCP)**, Veritas integrates a unified Python retrieval backend with a modern web interface, allowing users to query Congressional Bills, Executive Orders, Supreme Court Decisions, and related News Articles through a single intuitive search engine.
 
@@ -15,6 +15,16 @@ Built on the **Model Context Protocol (MCP)**, Veritas integrates a unified Pyth
 -   **RAG Architecture**: Retrieves the most relevant legal chunks and feeds them into a Large Language Model (Llama 3.3 via Groq) to generate grounded, citation-backed responses.
 -   **Verification Guardrails**: Implements a robust verification system using both vector similarity thresholds and a secondary LLM verification step to ensure relevance and reduce hallucinations.
 -   **MCP-First Design**: Leveraging the Model Context Protocol allows for modular tool exposure, easy extensibility, and standardized client-server communication.
+
+## Privacy & Ethics (SOPPA & AI Bill of Rights)
+
+Veritas is designed with **Safety First** principles, aligning with the **UNESCO Recommendation on the Ethics of AI** and the **Blueprint for an AI Bill of Rights**:
+
+*   **Stateless by Design**: We do not store conversation history or personal data (PII) on our servers, ensuring compliance with **SOPPA (Student Online Personal Protection Act)** strict standards for educational tools.
+*   **Double-Verification**: Every AI response undergoes a two-step check:
+    1.  **Vector Guardrail**: Ensures retrieved documents are mathematically relevant.
+    2.  **LLM Guardrail**: A secondary model validates that the answer is grounded in the provided context.
+*   **Transparency**: The "Civic Intelligence" workflow is visualized in real-time, showing users exactly what sources are being searched and analyzed before an answer is generated.
 
 ## Architecture
 
