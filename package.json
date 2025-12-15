@@ -1,0 +1,15 @@
+{
+    "name": "legal-ai-ui",
+    "version": "1.0.0",
+    "description": "Web UI for LegalAI MCP Server",
+    "type": "module",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "node --watch server.js"
+    },
+    "dependencies": {
+        "express": "^5.0.0",
+        "@modelcontextprotocol/sdk": "^1.0.1"
+    }
+}

@@ -1,9 +1,11 @@
 import os
+import sys
 # Fix for FAISS/Torch OpenMP conflict on macOS
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 import logging
+logging.basicConfig(level=logging.INFO, stream=sys.stderr, format='%(asctime)s - %(levelname)s - %(message)s')
 from mcp.server.fastmcp import FastMCP
 from typing import List
 import nltk
@@ -20,7 +22,7 @@ from OpinionClient import OpinionClient
 from util import cosine_similarity
 
 mcp = FastMCP("LegalAI")
-dsclient = GroqClient()
+llm_client = GroqClient()
 bills = BillClient()
 orders = OrderClient()
 opinions = OpinionClient()
@@ -29,11 +31,14 @@ try:
 except:
     model = SentenceTransformer("nomic-ai/nomic-embed-text-v1.5", trust_remote_code=True)
 
+convo_history = []
+context_history = []
+
 @mcp.tool()
 def search(query: str):
     context = []
     domains = choose_domain(query)
-    print(domains)
+    logging.info(f"Selected domains: {domains}")
 
     query_embedding = np.array(model.encode(f"search_query: {query}"), dtype=np.float32).reshape(1,-1)
     norm_qe = query_embedding/np.linalg.norm(query_embedding)
@@ -42,43 +47,57 @@ def search(query: str):
         try:
             context.extend(bills.search_congressional_bills(norm_qe))
         except Exception as e:
-            print(f"ERROR: Failed to search Congressional Bills: {e}")
+            logging.error(f"ERROR: Failed to search Congressional Bills: {e}")
 
     if "Executive Orders" in domains:
         try:
             context.extend(orders.search_executive_orders(norm_qe))
         except Exception as e:
-            print(f"ERROR: Failed to search Executive Orders: {e}")
+            logging.error(f"ERROR: Failed to search Executive Orders: {e}")
 
     if "Supreme Court Decisions" in domains:
         try:
             context.extend(opinions.search_supreme_court_decisions(norm_qe))
         except Exception as e:
-            print(f"ERROR: Failed to search Supreme Court Decisions: {e}")
+            logging.error(f"ERROR: Failed to search Supreme Court Decisions: {e}")
 
     if "News Articles" in domains:
         try:
             context.extend(get_news_articles(query, norm_qe))
         except Exception as e:
-            print(f"ERROR: Failed to search News Articles: {e}")
+            logging.error(f"ERROR: Failed to search News Articles: {e}")
     
     context.sort(key=lambda item: item['distance'], reverse=False)
     
     best_context = context[:5]
     formatted_context = format_context(best_context)
 
-    response = dsclient.chat(
+    response = llm_client.chat(
         f"""Answer the following query using the provided context. Make sure to cite any sources you are using.
         Query: {query}
         Context: {formatted_context}
         Answer:"""
     )
-    
-    return response if verify(query, query_embedding, best_context, formatted_context, response) else "I cannot respond to this query based on the provided context. Please try again or ask a different question."
+
+    context_history.extend(context)
+
+    if verify(query, query_embedding, best_context, formatted_context, response):
+        convo_history.append({
+            "query": query,
+            "previous_response": response
+        })
+        return response
+
+    else:
+        convo_history.append({
+            "query": query,
+            "previous_response": "context was not enough"
+        })
+        return "I cannot respond to this query based on the provided context. Please try again or ask a different question."
 
 @mcp.tool()
 def choose_domain(query: str):
-    return dsclient.chat(
+    return llm_client.chat(
         f"""Choose what domain this query can best be answered by:
         1. Congressional Bills
         2. Executive Orders
@@ -97,7 +116,7 @@ def choose_domain(query: str):
 
 @mcp.tool()
 def get_news_articles(query: str, query_embedding):
-    news = NewsClient(query, query_embedding, dsclient)
+    news = NewsClient(query, query_embedding, llm_client)
     keywords = news.query_processing()
     
     found_articles = []
@@ -157,7 +176,7 @@ def get_news_articles(query: str, query_embedding):
 def verify(query, query_embedding, documents, formatted_context, response):
     vector_guardrail_1 = documents[0]["distance"] <= 0.7
     vector_guardrail_2 = cosine_similarity(query_embedding, model.encode(response)) <= 0.5
-    deepseek_guardrail = "false" in dsclient.chat(
+    llm_guardrail = "false" in llm_client.chat(
         f"""Is the response generated not based in context or not answering the question? Only say 'true' or 'false'.
         
         If you say "true" that means that the response is not based in context or not answering the question.
@@ -171,16 +190,14 @@ def verify(query, query_embedding, documents, formatted_context, response):
         """
     )
 
-    if deepseek_guardrail & (vector_guardrail_1 | vector_guardrail_2):
+    logging.info(f"guardrail 1: {vector_guardrail_1}, 2: {vector_guardrail_2}, deepseek: {llm_guardrail}")
+
+    if llm_guardrail & (vector_guardrail_1 | vector_guardrail_2):
         return True
     elif vector_guardrail_1 & vector_guardrail_2:
         return True
     else:
         return False
-
-    print(f"guardrail 1: {vector_guardrail_1}, 2: {vector_guardrail_2}, deepseek: {deepseek_guardrail}")
-
-    return vector_guardrail_1 & vector_guardrail_2 & deepseek_guardrail
 
 def format_context(context: List[dict]) -> str:
     formatted_context = []
@@ -240,7 +257,48 @@ def format_context(context: List[dict]) -> str:
             
     return "\n\n".join(formatted_context)
 
+@mcp.tool()
+def follow_up(query: str):
+    query_embedding = np.array(model.encode(query), dtype=np.float32)
+    current = context_history.copy()
+    for context in current:
+        context["similarity"] = cosine_similarity(np.array(context["chunk"]["embedding"], dtype=np.float32), query_embedding)
+    
+    current.sort(key=lambda item: item['similarity'], reverse=False)
+    relevant_context = current[:5]
+    formatted_context = format_context(relevant_context)
+
+    llm_check = llm_client.chat(f"""
+    Read the query and say "true" or "false" if there is sufficient context to answer it.
+    Query: {query}
+    Context: {formatted_context}
+
+    Answer:
+    """)
+
+    if "true" in llm_check or relevant_context[0]["similarity"] < 0.5:
+        response = llm_client.chat(f"""
+        Answer a follow up question based in context and conversation history. Make sure to cite any sources you are using.
+        Follow-up question: {query}
+        Context: {formatted_context}
+        Conversation History: {convo_history}
+
+        Answer:
+        """)
+        convo_history.append({
+            "query": query,
+            "previous_response": response
+        })
+        return response
+    else:
+        search(query)
+
+@mcp.tool()
+def clean_history():
+    context_history.clear()
+    convo_history.clear()
+
 if __name__ == "__main__":
     logging.info("Starting MCP server...")
-    print("Starting MCP server...")
+    # print("Starting MCP server...")
     mcp.run(transport="stdio")

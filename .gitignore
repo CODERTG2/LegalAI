@@ -7,3 +7,4 @@
 /scripts/EXECUTIVE_ORDERS/*.csv
 /src/assets/
 /src/__pycache__
+/node_modules

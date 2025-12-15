@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veritas - Your Rights, Decoded</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="main-wrapper">
+        <div class="app-container">
+            <!-- Header -->
+            <header class="app-header">
+                <div class="brand">
+                    <div class="brand-icon">✨</div>
+                    <div class="brand-text">
+                        <h1>Veritas</h1>
+                    </div>
+                </div>
+                <button id="clear-btn" class="clear-btn" style="display: none;">Clear Chat</button>
+            </header>
+
+            <!-- Chat Viewport -->
+            <div id="chat-viewport" class="chat-viewport">
+                <!-- Welcome Screen (Visible initially) -->
+                <div id="welcome-screen" class="welcome-screen">
+                    <h2 id="greeting">Hello!</h2>
+                    <p>I'm your personal guide to US law and current events. What would you like to explore today?</p>
+
+                    <div class="suggestions">
+                        <div class="suggestion-card" onclick="setInput('What are the latest executive orders?')">
+                            <h3>📜 Executive Orders</h3>
+                            <p>Summarize the latest actions from the White House.</p>
+                        </div>
+                        <div class="suggestion-card" onclick="setInput('Explain tenant rights in California')">
+                            <h3>🏠 Housing Rights</h3>
+                            <p>What can my landlord actually do?</p>
+                        </div>
+                        <div class="suggestion-card" onclick="setInput('Recent Supreme Court rulings on tech')">
+                            <h3>⚖️ Supreme Court</h3>
+                            <p>Latest decisions affecting technology.</p>
+                        </div>
+                        <div class="suggestion-card student-loan-card"
+                            onclick="setInput('News on student loan forgiveness')">
+                            <h3>🎓 Student Loans</h3>
+                            <p>Current status and eligibility updates.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Message List (Hidden initially) -->
+                <div id="message-list" class="message-list" style="display: none;">
+                    <!-- Messages injected here -->
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-wrapper">
+                <div class="input-container">
+                    <input type="text" id="query-input" placeholder="Ask anything about law or news..."
+                        autocomplete="off">
+                    <button id="send-btn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="client.js"></script>
+</body>
+
+</html>
