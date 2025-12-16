@@ -13,6 +13,7 @@ Built on the **Model Context Protocol (MCP)**, Veritas integrates a unified Pyth
     -   Contextual News Articles
 -   **Semantic Intelligence**: Utilizes advanced `SentenceTransformer` embeddings to understand the *meaning* behind queries, ensuring high-quality retrieval beyond simple keyword matching.
 -   **RAG Architecture**: Retrieves the most relevant legal chunks and feeds them into a Large Language Model (Llama 3.3 via Groq) to generate grounded, citation-backed responses.
+-   **Graph RAG**: Enhances retrieval precision by traversing domain-specific **Knowledge Graphs** (using GLiNER for entity recognition) to prioritize document chunks that share relevant entities with the user's query.
 -   **Verification Guardrails**: Implements a robust verification system using both vector similarity thresholds and a secondary LLM verification step to ensure relevance and reduce hallucinations.
 -   **MCP-First Design**: Leveraging the Model Context Protocol allows for modular tool exposure, easy extensibility, and standardized client-server communication.
 
@@ -35,6 +36,7 @@ Veritas operates as a cohesive client-server application:
     -   Interacting with the Groq API for high-speed LLM inference.
     -   Exposing intelligent tools like `search`, `choose_domain`, `follow_up`, and `verify`.
     -   Managing conversation and context history.
+    -   **GraphRAG Engine (`src/GraphRAG.py`)**: A post-retrieval reranking system that uses NetworkX and GLiNER to boost the score of documents that contain entities found in the query's knowledge graph neighborhood.
 2.  **Web Client (`server.js`)**: A Node.js Express server that:
     -   Acts as an MCP client, launching and connecting to the Python server via stdio transport.
     -   Serves a modern, responsive frontend (`public/`) for seamless user interaction.
@@ -85,9 +87,9 @@ npm install
 ### 4. Data Setup
 
 Veritas relies on pre-built vector indices for its RAG capabilities. Ensure you have the following data artifacts populating `src/assets/`:
--   `bills.index` / `bills.json`
--   `orders.index` / `orders.json`
--   `opinions.index` / `opinions.json` (if applicable)
+-   `bills.index` / `bills.json` / `bills_knowledge_graph.gexf`
+-   `orders.index` / `orders.json` / `orders_knowledge_graph.gexf`
+-   `opinions.index` / `opinions.json` / `opinions_knowledge_graph.gexf` (if applicable)
 
 *Note: Utilities to scrape data, process chunks, and generate these indices are located in the `scripts/` directory.*
 
@@ -100,6 +102,7 @@ The `scripts/` directory houses the ETL (Extract, Transform, Load) pipelines res
     -   **Orders**: Sourced from the Federal Register.
     -   **Opinions**: Collected from Supreme Court databases.
 -   **Processing**: Specialized chunking logic (`*_chunking.ipynb`) segments legal text while preserving semantic context (e.g., keeping legal sections intact).
+-   **Graph Construction**: Entity extraction and relationship mapping to build `.gexf` knowledge graphs for Graph RAG.
 -   **Indexing**: Processed chunks are embedded using SentenceTransformers and stored in FAISS indices (`*.index`) to enable semantically accurate retrieval.
 
 ## Usage
