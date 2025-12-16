@@ -19,6 +19,7 @@ from LLMClient import GroqClient
 from NewsClient import NewsClient
 from OrderClient import OrderClient
 from OpinionClient import OpinionClient
+from Evaluator import Evaluator
 from util import cosine_similarity
 
 mcp = FastMCP("LegalAI")
@@ -45,33 +46,40 @@ def search(query: str):
     
     if "Congressional Bills" in domains:
         try:
+            logging.info("Searching Congressional Bills...")
             context.extend(bills.search_congressional_bills(norm_qe))
         except Exception as e:
             logging.error(f"ERROR: Failed to search Congressional Bills: {e}")
 
     if "Executive Orders" in domains:
         try:
+            logging.info("Searching Executive Orders...")
             context.extend(orders.search_executive_orders(norm_qe))
         except Exception as e:
             logging.error(f"ERROR: Failed to search Executive Orders: {e}")
 
     if "Supreme Court Decisions" in domains:
         try:
+            logging.info("Searching Supreme Court Decisions...")
             context.extend(opinions.search_supreme_court_decisions(norm_qe))
         except Exception as e:
             logging.error(f"ERROR: Failed to search Supreme Court Decisions: {e}")
 
     if "News Articles" in domains:
         try:
+            logging.info("Searching News Articles...")
             context.extend(get_news_articles(query, norm_qe))
         except Exception as e:
             logging.error(f"ERROR: Failed to search News Articles: {e}")
     
+    logging.info("Sorting context...")
     context.sort(key=lambda item: item['distance'], reverse=False)
     
+    logging.info("Selecting best context...")
     best_context = context[:5]
     formatted_context = format_context(best_context)
 
+    logging.info("Generating response...")
     response = llm_client.chat(
         f"""Answer the following query using the provided context. Make sure to cite any sources you are using.
         Query: {query}
@@ -79,14 +87,18 @@ def search(query: str):
         Answer:"""
     )
 
+    logging.info("Evaluating response...")
+    evaluator = Evaluator(query, query_embedding, best_context, formatted_context, response, model, llm_client)
+    response, evaluation = evaluator.evaluate()
     context_history.extend(context)
 
+    logging.info("Verifying response...")
     if verify(query, query_embedding, best_context, formatted_context, response):
         convo_history.append({
             "query": query,
             "previous_response": response
         })
-        return response
+        return response + evaluation
 
     else:
         convo_history.append({
