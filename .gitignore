@@ -8,3 +8,6 @@
 /src/assets/
 /src/__pycache__
 /node_modules
+/scripts/BILLS/*.gexf
+/scripts/COURT_OPINIONS/*.gexf
+/scripts/EXECUTIVE_ORDERS/*.gexf
