@@ -39,6 +39,9 @@ Veritas operates as a cohesive client-server application:
     -   Acts as an MCP client, launching and connecting to the Python server via stdio transport.
     -   Serves a modern, responsive frontend (`public/`) for seamless user interaction.
     -   Proxies user API requests to the MCP backend tools.
+3.  **Smart Evaluation & Drafting Loop**:
+    -   **Evaluator (`src/Evaluator.py`)**: Quantitatively measures response quality using vector embeddings. It calculates metrics for **Context-Query Relevance**, **Answer-Query Relevance**, and **Context-Answer Grounding** (hallucination check).
+    -   **Drafter Agent (`src/DrafterAgent.py`)**: If the Evaluator detects low scores (below 0.7), the Drafter Agent intervenes. It **assesses** the weak response to identify flaws (e.g., "needs grounding") and **redrafts** the answer to meet quality standards before display.
 
 ## Prerequisites
 
@@ -87,6 +90,17 @@ Veritas relies on pre-built vector indices for its RAG capabilities. Ensure you 
 -   `opinions.index` / `opinions.json` (if applicable)
 
 *Note: Utilities to scrape data, process chunks, and generate these indices are located in the `scripts/` directory.*
+
+## Data Pipeline
+
+The `scripts/` directory houses the ETL (Extract, Transform, Load) pipelines responsible for creating the knowledge base:
+
+-   **Scraping**: Custom notebooks (`scripts/*/scraping.ipynb`) retrieve raw text from trusted sources:
+    -   **Bills**: Scraped from Congress.gov.
+    -   **Orders**: Sourced from the Federal Register.
+    -   **Opinions**: Collected from Supreme Court databases.
+-   **Processing**: Specialized chunking logic (`*_chunking.ipynb`) segments legal text while preserving semantic context (e.g., keeping legal sections intact).
+-   **Indexing**: Processed chunks are embedded using SentenceTransformers and stored in FAISS indices (`*.index`) to enable semantically accurate retrieval.
 
 ## Usage
 
