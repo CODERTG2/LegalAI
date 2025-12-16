@@ -14,7 +14,7 @@ class Evaluator:
         self.response_embedding = np.array(self.model.encode(self.response), dtype=np.float32)
     
     def evaluate(self):
-        context_query = float(1-self.context[0]["distance"])
+        context_query = float(self.context[0]["metric"])
         answer_query = float(1-cosine_similarity(self.query_embedding, self.response_embedding))
         context_answer = float(1-cosine_similarity(self.response_embedding, np.array(self.context[0]["chunk"]["embedding"], dtype=np.float32)))
 

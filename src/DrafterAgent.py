@@ -65,7 +65,7 @@ Respond ONLY with JSON:
         
         Instructions:
         - Act as an AI assistant.
-        - State the answer directly with citations.
+        - State the answer directly with citations, where you give the author, article name, and source.
         - Do NOT use phrases like "Based on the provided context" or "According to the documents".
         - Focus on improvements: {', '.join(improvement_focus)}
         

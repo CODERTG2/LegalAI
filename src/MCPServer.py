@@ -73,7 +73,7 @@ def search(query: str):
             logging.error(f"ERROR: Failed to search News Articles: {e}")
     
     logging.info("Sorting context...")
-    context.sort(key=lambda item: item['distance'], reverse=False)
+    context.sort(key=lambda item: item['metric'], reverse=True)
     
     logging.info("Selecting best context...")
     best_context = context[:5]
