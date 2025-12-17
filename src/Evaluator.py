@@ -5,25 +5,28 @@ from util import cosine_similarity
 class Evaluator:
     def __init__(self, query, query_embedding, context, formatted_context, response, model, llm_client):
         self.query = query
-        self.query_embedding = query_embedding
+        self.query_embedding = np.array(query_embedding).flatten()
         self.context = context
         self.formatted_context = formatted_context
         self.response = response
         self.model = model
         self.llm_client = llm_client
-        self.response_embedding = np.array(self.model.encode(self.response), dtype=np.float32)
+        self.response_embedding = np.array(self.model.encode(self.response), dtype=np.float32).flatten()
     
     def evaluate(self):
-        context_query = float(self.context[0]["metric"])
+        if not self.context:
+            return self.response, "\n\n---\n**Evaluation:** No context available for evaluation."
+            
+        context_query = float(np.mean(self.context[0]["distance"]))
         answer_query = float(1-cosine_similarity(self.query_embedding, self.response_embedding))
-        context_answer = float(1-cosine_similarity(self.response_embedding, np.array(self.context[0]["chunk"]["embedding"], dtype=np.float32)))
+        context_answer = float(1-cosine_similarity(self.response_embedding, np.array(self.context[0]["chunk"]["embedding"], dtype=np.float32).flatten()))
 
         if context_query < 0.7 or answer_query < 0.7 or context_answer < 0.7:
             drafter = DrafterAgent(self.llm_client)
             new_response = drafter.draft(self.query, self.formatted_context, self.response)
-            new_response_embedding = np.array(self.model.encode(new_response), dtype=np.float32)
+            new_response_embedding = np.array(self.model.encode(new_response), dtype=np.float32).flatten()
             new_answer_query = float(1-cosine_similarity(self.query_embedding, new_response_embedding))
-            new_context_answer = float(1-cosine_similarity(np.array(self.context[0]["chunk"]["embedding"], dtype=np.float32), new_response_embedding))
+            new_context_answer = float(1-cosine_similarity(np.array(self.context[0]["chunk"]["embedding"], dtype=np.float32).flatten(), new_response_embedding))
             if new_answer_query > answer_query or new_context_answer > context_answer:
                 return new_response, self.formatted_evaluation(context_query, new_answer_query, new_context_answer)
             else:

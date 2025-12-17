@@ -13,6 +13,8 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from sentence_transformers import SentenceTransformer
 import numpy as np
+import mongoengine
+from dotenv import load_dotenv
 
 from BillClient import BillClient
 from LLMClient import GroqClient
@@ -20,6 +22,8 @@ from NewsClient import NewsClient
 from OrderClient import OrderClient
 from OpinionClient import OpinionClient
 from Evaluator import Evaluator
+from CacheHit import cache_hit
+from CacheDB import CacheDB
 from util import cosine_similarity
 
 mcp = FastMCP("LegalAI")
@@ -27,8 +31,12 @@ llm_client = GroqClient()
 bills = BillClient()
 orders = OrderClient()
 opinions = OpinionClient()
+
+load_dotenv()
 try:
     model = SentenceTransformer("src/assets/model", trust_remote_code=True)
+    mongoengine.connect(host=os.getenv("MONGO_URI"))
+
 except:
     model = SentenceTransformer("nomic-ai/nomic-embed-text-v1.5", trust_remote_code=True)
 
@@ -44,24 +52,29 @@ def search(query: str):
     query_embedding = np.array(model.encode(f"search_query: {query}"), dtype=np.float32).reshape(1,-1)
     norm_qe = query_embedding/np.linalg.norm(query_embedding)
     
+    answer, cached_query, similarity = cache_hit(query_embedding)
+    if answer:
+        logging.info("Cache hit!")
+        return answer
+    
     if "Congressional Bills" in domains:
         try:
             logging.info("Searching Congressional Bills...")
-            context.extend(bills.search_congressional_bills(norm_qe))
+            context.extend(bills.search_congressional_bills(query, norm_qe))
         except Exception as e:
             logging.error(f"ERROR: Failed to search Congressional Bills: {e}")
 
     if "Executive Orders" in domains:
         try:
             logging.info("Searching Executive Orders...")
-            context.extend(orders.search_executive_orders(norm_qe))
+            context.extend(orders.search_executive_orders(query, norm_qe))
         except Exception as e:
             logging.error(f"ERROR: Failed to search Executive Orders: {e}")
 
     if "Supreme Court Decisions" in domains:
         try:
             logging.info("Searching Supreme Court Decisions...")
-            context.extend(opinions.search_supreme_court_decisions(norm_qe))
+            context.extend(opinions.search_supreme_court_decisions(query, norm_qe))
         except Exception as e:
             logging.error(f"ERROR: Failed to search Supreme Court Decisions: {e}")
 
@@ -98,7 +111,19 @@ def search(query: str):
             "query": query,
             "previous_response": response
         })
-        return response + evaluation
+
+        final_response = response + evaluation
+        logging.info("Saving response to cache...")
+        CacheDB(
+                query=query,
+                answer=final_response,
+                embedding=query_embedding.flatten().tolist(),
+                evaluation="neutral",
+                feedback="",
+            ).save()
+
+        logging.info("Returning response...")
+        return final_response
 
     else:
         convo_history.append({
@@ -186,13 +211,16 @@ def get_news_articles(query: str, query_embedding):
 
 @mcp.tool()
 def verify(query, query_embedding, documents, formatted_context, response):
-    vector_guardrail_1 = documents[0]["distance"] <= 0.7
-    vector_guardrail_2 = cosine_similarity(query_embedding, model.encode(response)) <= 0.5
-    llm_guardrail = "false" in llm_client.chat(
-        f"""Is the response generated not based in context or not answering the question? Only say 'true' or 'false'.
+    try:
+        vector_guardrail_1 = documents[0]["metric"] >= 0.5
+    except:
+        vector_guardrail_1 = False
+    vector_guardrail_2 = cosine_similarity(query_embedding, np.array(model.encode(response), dtype=np.float32)) <= 0.5
+    llm_guardrail = "true" in llm_client.chat(
+        f"""Is the response generated based in context and answering the question? Only say 'true' or 'false'.
         
-        If you say "true" that means that the response is not based in context or not answering the question.
-        If you say "false" that means that the response is based in context and is answering the question.
+        If you say "true" that means that the response is based in context and is answering the question.
+        If you say "false" that means that the response is not based in context or not answering the question.
 
         Question: {query}
         Context: {formatted_context}
@@ -304,6 +332,14 @@ def follow_up(query: str):
         return response
     else:
         search(query)
+
+@mcp.tool()
+def update_user_evaluation(query, response, evaluation: str):
+    CacheDB.objects(query=query, answer=response).update(evaluation=evaluation)
+
+@mcp.tool()
+def update_user_feedback(query, response, feedback: str):
+    CacheDB.objects(query=query, answer=response).update(feedback=feedback)
 
 @mcp.tool()
 def clean_history():

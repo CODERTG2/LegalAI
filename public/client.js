@@ -125,11 +125,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.error) {
                 await typeMessage('ai', `**Error:** ${data.error}`);
             } else if (data.content && data.content[0] && data.content[0].text) {
-                await typeMessage('ai', data.content[0].text);
+                await typeMessage('ai', data.content[0].text, query);
                 // Mark conversation as active for next time
                 isFollowUp = true;
             } else if (typeof data === 'string') {
-                await typeMessage('ai', data);
+                await typeMessage('ai', data, query);
                 // Mark conversation as active for next time
                 isFollowUp = true;
             } else {
@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function typeMessage(role, text) {
+    async function typeMessage(role, text, query = null) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${role}`;
 
@@ -187,7 +187,123 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // Ensure final render matches exactly
         content.innerHTML = formatMarkdown(text);
+
+        // Add Feedback UI if query is present (meaning it's a response to a query)
+        if (query) {
+            addFeedbackControls(content, query, text);
+        }
+
         scrollToBottom();
+    }
+
+    function addFeedbackControls(container, query, response) {
+        const feedbackDiv = document.createElement('div');
+        feedbackDiv.className = 'feedback-actions';
+
+        const upBtn = document.createElement('button');
+        upBtn.className = 'feedback-btn';
+        upBtn.innerHTML = '👍';
+        upBtn.title = 'Helpful';
+
+        const downBtn = document.createElement('button');
+        downBtn.className = 'feedback-btn';
+        downBtn.innerHTML = '👎';
+        downBtn.title = 'Not helpful';
+
+        feedbackDiv.appendChild(upBtn);
+        feedbackDiv.appendChild(downBtn);
+        container.appendChild(feedbackDiv);
+
+        let hasVoted = false;
+
+        const handleVote = async (type) => {
+            if (hasVoted) return; // Prevent double voting for simplicity or allow change? Let's allow change visually but maybe just send update.
+
+            // Visual update
+            if (type === 'good') {
+                upBtn.classList.add('active', 'good');
+                downBtn.classList.remove('active', 'bad');
+            } else {
+                downBtn.classList.add('active', 'bad');
+                upBtn.classList.remove('active', 'good');
+            }
+
+            // Send to backend
+            try {
+                await fetch('/api/mcp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: "update_user_evaluation",
+                        arguments: {
+                            query: query,
+                            response: response,
+                            evaluation: type
+                        }
+                    })
+                });
+            } catch (e) {
+                console.error("Failed to send evaluation:", e);
+            }
+
+            // Show feedback form if bad
+            if (type === 'bad') {
+                showFeedbackForm(container, query, response);
+            }
+        };
+
+        upBtn.addEventListener('click', () => handleVote('good'));
+        downBtn.addEventListener('click', () => handleVote('bad'));
+    }
+
+    function showFeedbackForm(container, query, response) {
+        // Check if form already exists
+        if (container.querySelector('.feedback-form')) return;
+
+        const form = document.createElement('div');
+        form.className = 'feedback-form';
+
+        const textarea = document.createElement('textarea');
+        textarea.className = 'feedback-textarea';
+        textarea.placeholder = "Tell us more about what went wrong...";
+
+        const submitBtn = document.createElement('button');
+        submitBtn.className = 'feedback-submit';
+        submitBtn.textContent = 'Submit Feedback';
+
+        form.appendChild(textarea);
+        form.appendChild(submitBtn);
+        container.appendChild(form);
+        scrollToBottom();
+
+        submitBtn.addEventListener('click', async () => {
+            const feedback = textarea.value.trim();
+            if (!feedback) return;
+
+            submitBtn.textContent = 'Sending...';
+            submitBtn.disabled = true;
+
+            try {
+                await fetch('/api/mcp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: "update_user_feedback",
+                        arguments: {
+                            query: query,
+                            response: response,
+                            feedback: feedback
+                        }
+                    })
+                });
+
+                form.innerHTML = '<div style="color: #4ade80; margin-top: 0.5rem; font-size: 0.9rem;">Thank you for your feedback!</div>';
+            } catch (e) {
+                console.error("Failed to send feedback:", e);
+                submitBtn.textContent = 'Error. Try again.';
+                submitBtn.disabled = false;
+            }
+        });
     }
 
     // PII Guardrail

@@ -15,7 +15,7 @@ class BillClient:
         for d, i in zip(D[0], I[0]):
             context.append({
                 "chunk": self.chunks[i],
-                "distance": 1-d
+                "distance": float(1-d)
             })
         context.sort(key=lambda x: x["distance"], reverse=True)
         

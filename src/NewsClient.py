@@ -120,8 +120,8 @@ class NewsClient:
 
             chunks.append({
                 "chunk": chunk_dict,
-                "distance": float(cosine_similarity(chunk_dict["embedding"], self.query_embedding)),
-                "metric": 2*float(cosine_similarity(chunk_dict["embedding"], self.query_embedding)) / 2
+                "distance": float(cosine_similarity(chunk_dict["embedding"].flatten(), self.query_embedding)),
+                "metric": 2*float(np.mean(cosine_similarity(chunk_dict["embedding"].flatten(), self.query_embedding))) / 2
             })
         
         return chunks

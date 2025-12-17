@@ -11,3 +11,4 @@
 /scripts/BILLS/*.gexf
 /scripts/COURT_OPINIONS/*.gexf
 /scripts/EXECUTIVE_ORDERS/*.gexf
+server.log

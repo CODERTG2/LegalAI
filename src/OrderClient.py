@@ -10,14 +10,14 @@ class OrderClient:
         self.graph_path = "src/assets/orders_knowledge_graph.gexf"
         
 
-    def search_executive_orders(self, query_embedding):
+    def search_executive_orders(self, query, query_embedding):
         D, I = self.index.search(query_embedding, k=15)
 
         context = []
         for d, i in zip(D[0], I[0]):
             context.append({
                 "chunk": self.chunks[i],
-                "distance": 1-d
+                "distance": float(1-d)
             })
         context.sort(key=lambda x: x["distance"], reverse=True)
         
