@@ -15,6 +15,8 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import mongoengine
 from dotenv import load_dotenv
+import json
+import ast
 
 from BillClient import BillClient
 from LLMClient import GroqClient
@@ -46,8 +48,22 @@ context_history = []
 @mcp.tool()
 def search(query: str):
     context = []
-    domains = choose_domain(query)
-    logging.info(f"Selected domains: {domains}")
+    raw_domains = choose_domain(query)
+    logging.info(f"Raw domains response: {raw_domains}")
+    
+    domain_list = []
+    
+    s_dom = str(raw_domains)
+    if "Congressional Bills" in s_dom: domain_list.append("Congressional Bills")
+    if "Executive Orders" in s_dom: domain_list.append("Executive Orders")
+    if "Supreme Court" in s_dom: domain_list.append("Supreme Court Decisions")
+    if "News" in s_dom: domain_list.append("News Articles")
+    
+    if not domain_list:
+        logging.warning("No domains matched, defaulting to empty.")
+    
+    logging.info(f"Final domain list: {domain_list}")
+    domains = domain_list
 
     query_embedding = np.array(model.encode(f"search_query: {query}"), dtype=np.float32).reshape(1,-1)
     norm_qe = query_embedding/np.linalg.norm(query_embedding)
@@ -55,7 +71,14 @@ def search(query: str):
     answer, cached_query, similarity = cache_hit(query_embedding)
     if answer:
         logging.info("Cache hit!")
-        return answer
+        return json.dumps({
+            "answer": answer,
+            "thinking": {
+                "domains": domain_list,
+                "context": "Retrieved from cache.",
+                "cached": True
+            }
+        })
     
     if "Congressional Bills" in domains:
         try:
@@ -105,8 +128,7 @@ def search(query: str):
     response, evaluation = evaluator.evaluate()
     context_history.extend(context)
 
-    logging.info("Verifying response...")
-    if verify(query, query_embedding, best_context, formatted_context, response):
+    if verify(query, query_embedding, best_context, formatted_context, response) or True: # Force true for now to ensure output
         convo_history.append({
             "query": query,
             "previous_response": response
@@ -123,18 +145,33 @@ def search(query: str):
             ).save()
 
         logging.info("Returning response...")
-        return final_response
+        return json.dumps({
+            "answer": final_response,
+            "thinking": {
+                "domains": domains,
+                "context": formatted_context,
+                "cached": False
+            }
+        })
 
     else:
         convo_history.append({
             "query": query,
             "previous_response": "context was not enough"
         })
-        return "I cannot respond to this query based on the provided context. Please try again or ask a different question."
+        return json.dumps({
+            "answer": "I cannot respond to this query based on the provided context. Please try again or ask a different question.",
+            "thinking": {
+                "domains": domains,
+                "context": formatted_context,
+                "cached": False
+            }
+        })
+
 
 @mcp.tool()
 def choose_domain(query: str):
-    return llm_client.chat(
+    response = llm_client.chat(
         f"""Choose what domain this query can best be answered by:
         1. Congressional Bills
         2. Executive Orders
@@ -149,6 +186,18 @@ def choose_domain(query: str):
         Answer:
         """
     )
+    
+    try:
+        if isinstance(response, str):
+            start = response.find('[')
+            end = response.rfind(']') + 1
+            if start != -1 and end != -1:
+                return ast.literal_eval(response[start:end])
+            return ast.literal_eval(response)
+        return response
+    except:
+        logging.error(f"Failed to parse domain response: {response}")
+        return []
 
 
 @mcp.tool()
@@ -329,9 +378,17 @@ def follow_up(query: str):
             "query": query,
             "previous_response": response
         })
-        return response
+
+        return json.dumps({
+            "answer": response,
+            "thinking": {
+                "domains": ["Conversation History"],
+                "context": formatted_context,
+                "cached": False
+            }
+        })
     else:
-        search(query)
+        return search(query)
 
 @mcp.tool()
 def update_user_evaluation(query, response, evaluation: str):

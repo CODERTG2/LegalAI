@@ -607,3 +607,69 @@ body::before {
         transform: translateY(0);
     }
 }
+/* Thinking Details */
+.thinking-message .message-content {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.05);
+    padding: 0;
+    overflow: hidden;
+}
+
+.thinking-details {
+    width: 100%;
+}
+
+.thinking-details summary {
+    padding: 1rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    list-style: none;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.thinking-details summary:hover {
+    background: rgba(255, 255, 255, 0.03);
+    color: #fff;
+}
+
+.thinking-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.thinking-details summary::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: 0.5rem;
+    font-size: 0.8rem;
+    transition: transform 0.2s;
+}
+
+.thinking-details[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.thinking-content {
+    padding: 0 1rem 1rem 1rem;
+    border-top: 1px solid var(--glass-border);
+    font-size: 0.9rem;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.thinking-meta {
+    margin-bottom: 1rem;
+    display: grid;
+    gap: 0.5rem;
+    padding-top: 1rem;
+}
+
+.thinking-context-block {
+    font-size: 0.8rem;
+    color: #cbd5e1;
+    background: rgba(15, 23, 42, 0.5) !important;
+    border: 1px solid var(--glass-border);
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 0.5rem !important;
+}

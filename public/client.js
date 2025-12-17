@@ -125,13 +125,31 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.error) {
                 await typeMessage('ai', `**Error:** ${data.error}`);
             } else if (data.content && data.content[0] && data.content[0].text) {
-                await typeMessage('ai', data.content[0].text, query);
+                const rawText = data.content[0].text;
+                let parsed = null;
+                try {
+                    parsed = JSON.parse(rawText);
+                } catch (e) {
+                    // Not JSON, fallback to raw text
+                }
+
+                if (parsed && parsed.thinking) {
+                    // Render thinking details first
+                    renderThinkingDetails(parsed.thinking);
+                    // Render answer
+                    await typeMessage('ai', parsed.answer, query);
+                } else {
+                    // Legacy/fallback
+                    await typeMessage('ai', rawText, query);
+                }
+
                 // Mark conversation as active for next time
                 isFollowUp = true;
             } else if (typeof data === 'string') {
                 await typeMessage('ai', data, query);
                 // Mark conversation as active for next time
                 isFollowUp = true;
+
             } else {
                 await typeMessage('ai', "I'm not sure how to interpret that response.");
                 console.log('Unexpected response:', data);
@@ -449,5 +467,61 @@ document.addEventListener('DOMContentLoaded', () => {
         html = html.replace(/\n/g, '<br>');
 
         return html;
+    }
+
+    function renderThinkingDetails(thinking) {
+        const { domains, context, cached } = thinking;
+        const messageList = document.getElementById('message-list');
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message ai thinking-message';
+
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar';
+        avatar.textContent = '🧠';
+
+        const msgContent = document.createElement('div');
+        msgContent.className = 'message-content';
+
+        const details = document.createElement('details');
+        details.className = 'thinking-details';
+
+        const summary = document.createElement('summary');
+        summary.textContent = 'View Thinking Process';
+        details.appendChild(summary);
+
+        const content = document.createElement('div');
+        content.className = 'thinking-content';
+
+        // Metadata
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'thinking-meta';
+        metaDiv.innerHTML = `
+            <div style="margin-bottom: 4px;"><strong>Domains:</strong> ${domains ? domains.join(', ') : 'N/A'}</div>
+            <div><strong>Cached:</strong> ${cached ? '✅ Yes' : '❌ No'}</div>
+        `;
+        content.appendChild(metaDiv);
+
+        // Context
+        if (context) {
+            const contextHeader = document.createElement('div');
+            contextHeader.innerHTML = '<strong>Context Used:</strong>';
+            contextHeader.style.marginTop = '0.5rem';
+            content.appendChild(contextHeader);
+
+            const pre = document.createElement('pre');
+            pre.className = 'thinking-context-block';
+            pre.textContent = context;
+            content.appendChild(pre);
+        }
+
+        details.appendChild(content);
+        msgContent.appendChild(details);
+
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(msgContent);
+
+        messageList.appendChild(messageDiv);
+        scrollToBottom();
     }
 });
