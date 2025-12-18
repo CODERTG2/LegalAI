@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Render thinking details first
                     renderThinkingDetails(parsed.thinking);
                     // Render answer
-                    await typeMessage('ai', parsed.answer, query);
+                    await typeMessage('ai', parsed.answer, query, parsed.sources);
                 } else {
                     // Legacy/fallback
                     await typeMessage('ai', rawText, query);
@@ -217,6 +217,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Mark conversation as active for next time
                 isFollowUp = true;
 
+            } else if (data.answer) {
+                // Handle direct JSON response from my new backend structure
+                if (data.thinking) {
+                    renderThinkingDetails(data.thinking);
+                }
+                await typeMessage('ai', data.answer, query, data.sources);
+                isFollowUp = true;
             } else {
                 await typeMessage('ai', "I'm not sure how to interpret that response.");
                 console.log('Unexpected response:', data);
@@ -234,9 +241,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function typeMessage(role, text, query = null) {
+    async function typeMessage(role, text, query = null, sources = []) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${role}`;
+
+        if (sources && sources.length > 0) {
+            messageDiv.dataset.sources = JSON.stringify(sources);
+        }
 
         const avatar = document.createElement('div');
         avatar.className = 'avatar';
@@ -531,7 +542,12 @@ document.addEventListener('DOMContentLoaded', () => {
         html = html.replace(/<\/ul>\s*<ul>/g, ''); // Join adjacent lists
 
         // New lines to <br> (only if not inside pre tags)
+        // New lines to <br> (only if not inside pre tags)
         html = html.replace(/\n/g, '<br>');
+
+        // Citations [1] -> <span ...>[1]</span>
+        // Check for sources only if we really want to be strict, but simple regex is fine
+        html = html.replace(/\[(\d+)\]/g, '<span class="citation-link" data-index="$1">[$1]</span>');
 
         return html;
     }
@@ -590,5 +606,110 @@ document.addEventListener('DOMContentLoaded', () => {
 
         messageList.appendChild(messageDiv);
         scrollToBottom();
+    }
+
+    // Tooltip Logic
+    const tooltip = document.createElement('div');
+    tooltip.className = 'citation-tooltip';
+    document.body.appendChild(tooltip);
+
+    let activeTooltipTarget = null;
+
+    messageList.addEventListener('mouseover', (e) => {
+        if (e.target.classList.contains('citation-link')) {
+            const link = e.target;
+            const index = parseInt(link.dataset.index);
+            const messageDiv = link.closest('.message');
+
+            if (messageDiv && messageDiv.dataset.sources) {
+                try {
+                    const sources = JSON.parse(messageDiv.dataset.sources);
+                    // Adjust for 1-based index
+                    const source = sources[index - 1];
+                    if (source) {
+                        showTooltip(link, source);
+                    }
+                } catch (err) {
+                    console.error("Error parsing sources", err);
+                }
+            }
+        }
+    });
+
+    messageList.addEventListener('mouseout', (e) => {
+        if (e.target.classList.contains('citation-link')) {
+            hideTooltip();
+        }
+    });
+
+    function showTooltip(target, sourceData) {
+        activeTooltipTarget = target;
+
+        // Extract useful info from sourceData
+        // Need to replicate format_context logic or just use what's available
+        const chunk = sourceData.chunk || {};
+        let title = "Source";
+        let meta = "";
+        let body = "";
+        let url = null;
+
+        if (chunk.congress) {
+            title = `Bill: ${chunk.title || 'Unknown'}`;
+            meta = `${chunk.congress}th Congress, H.R. ${chunk.number}`;
+            body = chunk.latestAction?.text || "No action text";
+        } else if (chunk.order_number) {
+            title = `Executive Order: ${chunk.title || 'Unknown'}`;
+            meta = chunk.signing_date || "";
+            body = chunk.chunk_text?.text || "";
+        } else if (chunk.resource_uri) { // Supreme Court
+            title = "Supreme Court Decision";
+            meta = chunk.date_created || "";
+            body = chunk.text || "";
+            url = chunk.absolute_url;
+        } else if (chunk.body) { // News
+            title = chunk.title || "News Article";
+            meta = chunk.date || "";
+            body = chunk.body || "";
+            url = sourceData.uri; // NewsClient.py uses 'uri' if available
+        } else {
+            body = JSON.stringify(chunk).slice(0, 100) + "...";
+        }
+
+        // Truncate body
+        if (body.length > 150) body = body.slice(0, 150) + "...";
+
+        let html = `<strong>${title}</strong><br>`;
+        if (meta) html += `<span style="opacity:0.8; font-size:0.85em;">${meta}</span><br>`;
+        html += `<div style="margin-top:4px; font-size:0.9em; line-height:1.4;">${body}</div>`;
+        if (url) {
+            html += `<a href="${url}" target="_blank" style="display:block; margin-top:6px; color:#60a5fa; font-size:0.85em;">Open Link ↗</a>`;
+        }
+
+        tooltip.innerHTML = html;
+        tooltip.style.display = 'block';
+
+        // Position logic
+        const rect = target.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+
+        let top = rect.top - tooltipRect.height - 10;
+        let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+
+        // Keep in bounds
+        if (left < 10) left = 10;
+        if (left + tooltipRect.width > window.innerWidth - 10) {
+            left = window.innerWidth - tooltipRect.width - 10;
+        }
+        if (top < 10) {
+            top = rect.bottom + 10; // Flip to bottom if no space on top
+        }
+
+        tooltip.style.top = `${top}px`;
+        tooltip.style.left = `${left}px`;
+    }
+
+    function hideTooltip() {
+        tooltip.style.display = 'none';
+        activeTooltipTarget = null;
     }
 });

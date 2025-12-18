@@ -887,3 +887,37 @@ body::before {
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
 }
+
+/* Citations */
+.citation-link {
+    color: #60a5fa;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.9em;
+    padding: 0 2px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.citation-link:hover {
+    background-color: rgba(96, 165, 250, 0.1);
+    text-decoration: underline;
+}
+
+/* Tooltip */
+.citation-tooltip {
+    display: none;
+    position: fixed;
+    width: 300px;
+    max-width: 90vw;
+    background-color: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    pointer-events: auto;
+    /* Allow clicking links inside */
+    font-size: 0.9rem;
+    color: #e5e7eb;
+}

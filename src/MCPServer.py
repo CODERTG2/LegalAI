@@ -120,7 +120,10 @@ def search(query: str, k_bills=5, k_orders=5, k_opinions=5, domains=""):
 
     logging.info("Generating response...")
     response = llm_client.chat(
-        f"""Answer the following query using the provided context. Make sure to cite any sources you are using.
+        f"""Answer the following query using the provided context. 
+        You MUST cite your sources using the format [1], [2], etc. corresponding to the numbered context items provided.
+        Do not include the full title in the text, just the bracketed number.
+
         Query: {query}
         Context: {formatted_context}
         Answer:"""
@@ -148,14 +151,16 @@ def search(query: str, k_bills=5, k_orders=5, k_opinions=5, domains=""):
             ).save()
 
         logging.info("Returning response...")
-        return json.dumps({
+        response_data = {
             "answer": final_response,
+            "sources": best_context,
             "thinking": {
                 "domains": domains,
                 "context": formatted_context,
                 "cached": False
             }
-        })
+        }
+        return json.dumps(sanitize_for_json(response_data))
 
     else:
         convo_history.append({
@@ -170,7 +175,26 @@ def search(query: str, k_bills=5, k_orders=5, k_opinions=5, domains=""):
                 "cached": False
             }
         })
+    
 
+def sanitize_for_json(obj):
+    if isinstance(obj, float):
+        if np.isnan(obj) or np.isinf(obj):
+            return None
+        return obj
+    elif isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_for_json(i) for i in obj]
+    elif isinstance(obj, (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64)):
+        return int(obj)
+    elif isinstance(obj, (np.float16, np.float32, np.float64)):
+        if np.isnan(obj) or np.isinf(obj):
+            return None
+        return float(obj)
+    elif isinstance(obj, (np.ndarray,)): 
+        return sanitize_for_json(obj.tolist())
+    return obj
 
 @mcp.tool()
 def choose_domain(query: str):
@@ -294,8 +318,9 @@ def verify(query, query_embedding, documents, formatted_context, response):
 def format_context(context: List[dict]) -> str:
     formatted_context = []
     
-    for item in context:
+    for i, item in enumerate(context, 1):
         chunk = item.get('chunk', {})
+        prefix = f"[{i}] "
         
         # Congressional Bill
         if 'congress' in chunk and 'number' in chunk:
@@ -306,7 +331,7 @@ def format_context(context: List[dict]) -> str:
             action_text = latest_action.get('text', 'No action text')
             action_date = latest_action.get('actionDate', 'Unknown Date')
             
-            entry = f"Congressional Bill: {title} ({congress}th Congress, H.R. {number})\n" \
+            entry = f"{prefix}Congressional Bill: {title} ({congress}th Congress, H.R. {number})\n" \
                     f"Date: {action_date}\n" \
                     f"Latest Action: {action_text}"
             formatted_context.append(entry)
@@ -318,7 +343,7 @@ def format_context(context: List[dict]) -> str:
             chunk_text_obj = chunk.get('chunk_text', {})
             text = chunk_text_obj.get('text', '') if isinstance(chunk_text_obj, dict) else str(chunk_text_obj)
             
-            entry = f"Executive Order: {title} ({date})\n" \
+            entry = f"{prefix}Executive Order: {title} ({date})\n" \
                     f"Text: {text}"
             formatted_context.append(entry)
             
@@ -328,7 +353,7 @@ def format_context(context: List[dict]) -> str:
             text = chunk.get('text', '')
             url = chunk.get('absolute_url', '')
             
-            entry = f"Supreme Court Decision ({date})\n" \
+            entry = f"{prefix}Supreme Court Decision ({date})\n" \
                     f"URL: {url}\n" \
                     f"Text: {text}"
             formatted_context.append(entry)
@@ -339,13 +364,13 @@ def format_context(context: List[dict]) -> str:
             body = chunk.get('body', '')
             date = chunk.get('date', 'Unknown Date') # Assuming date field exists, defaulting if not
             
-            entry = f"News Article: {title} ({date})\n" \
+            entry = f"{prefix}News Article: {title} ({date})\n" \
                     f"Content: {body}"
             formatted_context.append(entry)
             
         else:
             # Fallback for unknown types
-            formatted_context.append(f"Unknown Source: {str(chunk)}")
+            formatted_context.append(f"{prefix}Unknown Source: {str(chunk)}")
             
     return "\n\n".join(formatted_context)
 
@@ -370,7 +395,9 @@ def follow_up(query: str, k_bills: int, k_orders: int, k_opinions: int, domains 
 
     if "true" in llm_check or relevant_context[0]["similarity"] < 0.5:
         response = llm_client.chat(f"""
-        Answer a follow up question based in context and conversation history. Make sure to cite any sources you are using.
+        Answer a follow up question based in context and conversation history. 
+        You MUST cite your sources using the format [1], [2], etc.
+        
         Follow-up question: {query}
         Context: {formatted_context}
         Conversation History: {convo_history}
@@ -382,14 +409,15 @@ def follow_up(query: str, k_bills: int, k_orders: int, k_opinions: int, domains 
             "previous_response": response
         })
 
-        return json.dumps({
+        return json.dumps(sanitize_for_json({
             "answer": response,
+            "sources": relevant_context,
             "thinking": {
                 "domains": ["Conversation History"],
                 "context": formatted_context,
                 "cached": False
             }
-        })
+        }))
     else:
         return search(query, k_bills, k_orders, k_opinions, domains)
 
