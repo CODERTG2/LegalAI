@@ -12,6 +12,10 @@ Built on the **Model Context Protocol (MCP)**, Veritas integrates a unified Pyth
     -   Supreme Court Decisions
     -   Contextual News Articles
 -   **Semantic Intelligence**: Utilizes advanced `SentenceTransformer` embeddings to understand the *meaning* behind queries, ensuring high-quality retrieval beyond simple keyword matching.
+-   **Interactive Citations**: Citations in the AI response (e.g., `[1]`) are fully interactive. Hovering or clicking reveals a detailed tooltip with the source title, relevant metadata, and a snippet of the text.
+-   **Thinking Process Visualization**: The UI visualizes the AI's cognitive steps in real-time ("Analyzing query...", "Retrieving documents...", "Verifying..."), providing transparency into the system's logic.
+-   **Search Retrieval Settings**: A granular settings panel allows users to toggle specific data domains and adjust the number of documents retrieved for each source type.
+-   **User Feedback Loop**: Integrated thumbs-up/down feedback mechanism allows users to rate responses, helping to build a dataset for future fine-tuning (RLHF).
 -   **RAG Architecture**: Retrieves the most relevant legal chunks and feeds them into a Large Language Model (Llama 3.3 via Groq) to generate grounded, citation-backed responses.
 -   **Graph RAG**: Enhances retrieval precision by traversing domain-specific **Knowledge Graphs** (using GLiNER for entity recognition) to prioritize document chunks that share relevant entities with the user's query.
 -   **Verification Guardrails**: Implements a robust verification system using both vector similarity thresholds and a secondary LLM verification step to ensure relevance and reduce hallucinations.
@@ -22,6 +26,7 @@ Built on the **Model Context Protocol (MCP)**, Veritas integrates a unified Pyth
 Veritas is designed with **Safety First** principles, aligning with the **UNESCO Recommendation on the Ethics of AI** and the **Blueprint for an AI Bill of Rights**:
 
 *   **Stateless by Design**: We do not store conversation history or personal data (PII) on our servers, ensuring compliance with **SOPPA (Student Online Personal Protection Act)** strict standards for educational tools.
+*   **Client-Side PII Guardrails**: The frontend proactively scans queries for sensitive patterns (SSN, Phone, Email) and issues a warning *before* checks are sent to the server, preventing accidental data leakage.
 *   **Double-Verification**: Every AI response undergoes a two-step check:
     1.  **Vector Guardrail**: Ensures retrieved documents are mathematically relevant.
     2.  **LLM Guardrail**: A secondary model validates that the answer is grounded in the provided context.
