@@ -46,21 +46,24 @@ convo_history = []
 context_history = []
 
 @mcp.tool()
-def search(query: str):
+def search(query: str, k_bills=5, k_orders=5, k_opinions=5, domains=""):
     context = []
-    raw_domains = choose_domain(query)
-    logging.info(f"Raw domains response: {raw_domains}")
+    if domains != "":
+        domain_list = domains.split(",")
+    else:
+        raw_domains = choose_domain(query)
+        logging.info(f"Raw domains response: {raw_domains}")
+        
+        domain_list = []
     
-    domain_list = []
-    
-    s_dom = str(raw_domains)
-    if "Congressional Bills" in s_dom: domain_list.append("Congressional Bills")
-    if "Executive Orders" in s_dom: domain_list.append("Executive Orders")
-    if "Supreme Court" in s_dom: domain_list.append("Supreme Court Decisions")
-    if "News" in s_dom: domain_list.append("News Articles")
-    
-    if not domain_list:
-        logging.warning("No domains matched, defaulting to empty.")
+        s_dom = str(raw_domains)
+        if "Congressional Bills" in s_dom: domain_list.append("Congressional Bills")
+        if "Executive Orders" in s_dom: domain_list.append("Executive Orders")
+        if "Supreme Court" in s_dom: domain_list.append("Supreme Court Decisions")
+        if "News" in s_dom: domain_list.append("News Articles")
+        
+        if not domain_list:
+            logging.warning("No domains matched, defaulting to empty.")
     
     logging.info(f"Final domain list: {domain_list}")
     domains = domain_list
@@ -83,21 +86,21 @@ def search(query: str):
     if "Congressional Bills" in domains:
         try:
             logging.info("Searching Congressional Bills...")
-            context.extend(bills.search_congressional_bills(query, norm_qe))
+            context.extend(bills.search_congressional_bills(query, norm_qe, k_bills))
         except Exception as e:
             logging.error(f"ERROR: Failed to search Congressional Bills: {e}")
 
     if "Executive Orders" in domains:
         try:
             logging.info("Searching Executive Orders...")
-            context.extend(orders.search_executive_orders(query, norm_qe))
+            context.extend(orders.search_executive_orders(query, norm_qe, k_orders))
         except Exception as e:
             logging.error(f"ERROR: Failed to search Executive Orders: {e}")
 
     if "Supreme Court Decisions" in domains:
         try:
             logging.info("Searching Supreme Court Decisions...")
-            context.extend(opinions.search_supreme_court_decisions(query, norm_qe))
+            context.extend(opinions.search_supreme_court_decisions(query, norm_qe, k_opinions))
         except Exception as e:
             logging.error(f"ERROR: Failed to search Supreme Court Decisions: {e}")
 
@@ -347,7 +350,7 @@ def format_context(context: List[dict]) -> str:
     return "\n\n".join(formatted_context)
 
 @mcp.tool()
-def follow_up(query: str):
+def follow_up(query: str, k_bills: int, k_orders: int, k_opinions: int, domains = ""):
     query_embedding = np.array(model.encode(query), dtype=np.float32)
     current = context_history.copy()
     for context in current:
@@ -388,7 +391,7 @@ def follow_up(query: str):
             }
         })
     else:
-        return search(query)
+        return search(query, k_bills, k_orders, k_opinions, domains)
 
 @mcp.tool()
 def update_user_evaluation(query, response, evaluation: str):

@@ -22,8 +22,64 @@
                         <span>Civic Intelligence Engine</span>
                     </div>
                 </div>
+                <button id="settings-toggle" class="settings-btn" title="Search Configuration">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </button>
                 <button id="clear-btn" class="clear-btn" style="display: none;">Clear Chat</button>
             </header>
+
+            <!-- Settings Panel -->
+            <div id="settings-panel" class="settings-panel">
+                <div class="settings-content">
+                    <div class="settings-section">
+                        <h4>Chunk Limit</h4>
+                        <div class="slider-group">
+                            <label>Bills <span id="val-bills">5</span></label>
+                            <input type="range" id="slider-bills" min="1" max="15" value="5">
+                        </div>
+                        <div class="slider-group">
+                            <label>Orders <span id="val-orders">5</span></label>
+                            <input type="range" id="slider-orders" min="1" max="15" value="5">
+                        </div>
+                        <div class="slider-group">
+                            <label>Opinions <span id="val-opinions">5</span></label>
+                            <input type="range" id="slider-opinions" min="1" max="15" value="5">
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h4>Domains</h4>
+                        <div class="checkbox-group">
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="check-auto" checked>
+                                <span class="checkmark"></span>
+                                Automatic
+                            </label>
+                            <div class="manual-domains" id="manual-domains">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" data-domain="Congressional Bills">
+                                    <span class="checkmark"></span>
+                                    Bills
+                                </label>
+                                <label class="checkbox-container">
+                                    <input type="checkbox" data-domain="Executive Orders">
+                                    <span class="checkmark"></span>
+                                    Orders
+                                </label>
+                                <label class="checkbox-container">
+                                    <input type="checkbox" data-domain="Supreme Court Decisions">
+                                    <span class="checkmark"></span>
+                                    Opinions
+                                </label>
+                                <label class="checkbox-container">
+                                    <input type="checkbox" data-domain="News Articles">
+                                    <span class="checkmark"></span>
+                                    News
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Chat Viewport -->
             <div id="chat-viewport" class="chat-viewport">

@@ -8,8 +8,8 @@ class BillClient:
         with open("src/assets/bills.json", "r") as f:
             self.chunks = json.load(f)
 
-    def search_congressional_bills(self, query, query_embedding):
-        D, I = self.index.search(query_embedding, k=15)
+    def search_congressional_bills(self, query, query_embedding, k=5):
+        D, I = self.index.search(query_embedding, k=k)
 
         context = []
         for d, i in zip(D[0], I[0]):

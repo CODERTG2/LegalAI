@@ -8,8 +8,8 @@ class OpinionClient:
         with open("src/assets/opinions.json", "r") as f:
             self.chunks = json.load(f)
 
-    def search_supreme_court_decisions(self, query, query_embedding):
-        D, I = self.index.search(query_embedding, k=15)
+    def search_supreme_court_decisions(self, query, query_embedding, k=5):
+        D, I = self.index.search(query_embedding, k=k)
 
         context = []
         for d, i in zip(D[0], I[0]):

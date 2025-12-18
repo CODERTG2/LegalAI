@@ -8,8 +8,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearButton = document.getElementById('clear-btn');
     const greetingEl = document.getElementById('greeting');
 
-    // State tracking
+    // Settings Elements
+    const settingsToggle = document.getElementById('settings-toggle');
+    const settingsPanel = document.getElementById('settings-panel');
+    const checkAuto = document.getElementById('check-auto');
+    const manualDomainsContainer = document.getElementById('manual-domains');
+
+    // Sliders
+    const sliderBills = document.getElementById('slider-bills');
+    const valBills = document.getElementById('val-bills');
+    const sliderOrders = document.getElementById('slider-orders');
+    const valOrders = document.getElementById('val-orders');
+    const sliderOpinions = document.getElementById('slider-opinions');
+    const valOpinions = document.getElementById('val-opinions');
+
+    // Settings State
+    let settingsOpen = false;
     let isFollowUp = false;
+
+    // Toggle Settings
+    settingsToggle.addEventListener('click', () => {
+        settingsOpen = !settingsOpen;
+        settingsPanel.classList.toggle('open', settingsOpen);
+        settingsToggle.classList.toggle('active', settingsOpen);
+    });
+
+    // Slider Updates
+    function connectSlider(slider, display) {
+        slider.addEventListener('input', () => {
+            display.textContent = slider.value;
+        });
+    }
+    connectSlider(sliderBills, valBills);
+    connectSlider(sliderOrders, valOrders);
+    connectSlider(sliderOpinions, valOpinions);
+
+    // Domain toggling logic
+    checkAuto.addEventListener('change', () => {
+        if (checkAuto.checked) {
+            manualDomainsContainer.classList.remove('active');
+            // Uncheck all manual to avoid confusion? Or just visually disable?
+            // Let's visually disable as handled by CSS pointer-events
+        } else {
+            manualDomainsContainer.classList.add('active');
+        }
+    });
+
+    // Helper to get selected domains
+    function getSelectedDomains() {
+        if (checkAuto.checked) return ""; // Empty string triggers auto logic in backend
+
+        const checkboxes = manualDomainsContainer.querySelectorAll('input[type="checkbox"]:checked');
+        const domains = Array.from(checkboxes).map(cb => cb.dataset.domain);
+        return domains.join(",");
+    }
 
     // Dynamic Greeting
     const hour = new Date().getHours();
@@ -86,6 +138,12 @@ document.addEventListener('DOMContentLoaded', () => {
         queryInput.disabled = true;
         sendButton.disabled = true;
 
+        // Collect Settings
+        const k_bills = parseInt(sliderBills.value);
+        const k_orders = parseInt(sliderOrders.value);
+        const k_opinions = parseInt(sliderOpinions.value);
+        const selectedDomains = getSelectedDomains();
+
         // Show thinking process
         const steps = ["Analyzing query intent...", "Retrieving legal documents...", "Verifying citations..."];
         const thinkingId = await showThinkingProcess(steps);
@@ -105,6 +163,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // Determine tool to call
             const toolName = isFollowUp ? "follow_up" : "search";
 
+            // Build arguments
+            const args = {
+                query: query,
+                k_bills: k_bills,
+                k_orders: k_orders,
+                k_opinions: k_opinions,
+                domains: selectedDomains
+            };
+
             const response = await fetch('/api/mcp', {
                 method: 'POST',
                 headers: {
@@ -112,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     name: toolName,
-                    arguments: { query: query }
+                    arguments: args
                 })
             });
 
