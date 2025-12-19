@@ -46,7 +46,7 @@ convo_history = []
 context_history = []
 
 @mcp.tool()
-def search(query: str, k_bills=5, k_orders=5, k_opinions=5, domains=""):
+def search(query: str, k_bills=5, k_orders=5, k_opinions=5, domains="", use_cache: bool = False):
     context = []
     if domains != "":
         domain_list = domains.split(",")
@@ -71,17 +71,19 @@ def search(query: str, k_bills=5, k_orders=5, k_opinions=5, domains=""):
     query_embedding = np.array(model.encode(f"search_query: {query}"), dtype=np.float32).reshape(1,-1)
     norm_qe = query_embedding/np.linalg.norm(query_embedding)
     
-    answer, cached_query, similarity = cache_hit(query_embedding)
-    if answer:
-        logging.info("Cache hit!")
-        return json.dumps({
-            "answer": answer,
-            "thinking": {
-                "domains": domain_list,
-                "context": "Retrieved from cache.",
-                "cached": True
-            }
-        })
+    
+    if use_cache:
+        answer, cached_query, similarity = cache_hit(query_embedding)
+        if answer:
+            logging.info("Cache hit!")
+            return json.dumps({
+                "answer": answer,
+                "thinking": {
+                    "domains": domain_list,
+                    "context": "Retrieved from cache.",
+                    "cached": True
+                }
+            })
     
     if "Congressional Bills" in domains:
         try:
@@ -141,14 +143,15 @@ def search(query: str, k_bills=5, k_orders=5, k_opinions=5, domains=""):
         })
 
         final_response = response + evaluation
-        logging.info("Saving response to cache...")
-        CacheDB(
-                query=query,
-                answer=final_response,
-                embedding=query_embedding.flatten().tolist(),
-                evaluation="neutral",
-                feedback="",
-            ).save()
+        if use_cache:
+            logging.info("Saving response to cache...")
+            CacheDB(
+                    query=query,
+                    answer=final_response,
+                    embedding=query_embedding.flatten().tolist(),
+                    evaluation="neutral",
+                    feedback="",
+                ).save()
 
         logging.info("Returning response...")
         response_data = {
@@ -375,7 +378,7 @@ def format_context(context: List[dict]) -> str:
     return "\n\n".join(formatted_context)
 
 @mcp.tool()
-def follow_up(query: str, k_bills: int, k_orders: int, k_opinions: int, domains = ""):
+def follow_up(query: str, k_bills: int, k_orders: int, k_opinions: int, domains = "", use_cache: bool = False):
     query_embedding = np.array(model.encode(query), dtype=np.float32)
     current = context_history.copy()
     for context in current:
@@ -419,7 +422,7 @@ def follow_up(query: str, k_bills: int, k_orders: int, k_opinions: int, domains 
             }
         }))
     else:
-        return search(query, k_bills, k_orders, k_opinions, domains)
+        return search(query, k_bills, k_orders, k_opinions, domains, use_cache=use_cache)
 
 @mcp.tool()
 def update_user_evaluation(query, response, evaluation: str):
@@ -428,6 +431,7 @@ def update_user_evaluation(query, response, evaluation: str):
 @mcp.tool()
 def update_user_feedback(query, response, feedback: str):
     CacheDB.objects(query=query, answer=response).update(feedback=feedback)
+
 
 @mcp.tool()
 def clean_history():

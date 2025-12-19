@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsPanel = document.getElementById('settings-panel');
     const checkAuto = document.getElementById('check-auto');
     const manualDomainsContainer = document.getElementById('manual-domains');
+    const checkHistory = document.getElementById('check-history');
 
     // Sliders
     const sliderBills = document.getElementById('slider-bills');
@@ -143,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const k_orders = parseInt(sliderOrders.value);
         const k_opinions = parseInt(sliderOpinions.value);
         const selectedDomains = getSelectedDomains();
+        const useCache = checkHistory.checked;
 
         // Show thinking process
         const steps = ["Analyzing query intent...", "Retrieving legal documents...", "Verifying citations..."];
@@ -169,7 +171,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 k_bills: k_bills,
                 k_orders: k_orders,
                 k_opinions: k_opinions,
-                domains: selectedDomains
+                domains: selectedDomains,
+                use_cache: useCache
+
             };
 
             const response = await fetch('/api/mcp', {
