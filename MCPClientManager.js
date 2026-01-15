@@ -13,7 +13,7 @@ class MCPClientManager {
         try {
             console.log('Initializing MCP client...');
             const transport = new StdioClientTransport({
-                command: '.venv/bin/python',
+                command: 'python',
                 args: ['src/MCPServer.py']
             });
 
