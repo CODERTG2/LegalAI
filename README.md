@@ -36,6 +36,25 @@ Veritas is designed with **Safety First** principles, aligning with the **UNESCO
 
 Veritas operates as a cohesive client-server application:
 
+```mermaid
+graph TD
+    User[User] -->|Interacts| UI[Web Interface (Public/)]
+    UI -->|HTTP Request| Node[Node.js Server (server.js)]
+    
+    subgraph "MCP Architecture"
+        Node -->|Calls| MCP_Client[MCP Client (MCPClientManager.js)]
+        MCP_Client <-->|Stdio Transport| MCP_Server[Python MCP Server (MCPServer.py)]
+        
+        MCP_Server -->|Selects| Tools[Tools: search, verify, etc.]
+        Tools -->|Queries| Clients[Domain Clients (Bill, Order, Opinion)]
+        Tools -->|Inference| LLM[Groq LLM API]
+        
+        Clients <-->|Retrieves| VectorDB[(FAISS Indices & JSON)]
+        Clients <-->|Queries| KG[Knowledge Graphs]
+    end
+```
+
+
 1.  **MCP Server (`src/MCPServer.py`)**: A Python-based server implementing the `LegalAI` MCP service. It handles:
     -   Loading FAISS vector indices for millisecond-latency retrieval.
     -   Interacting with the Groq API for high-speed LLM inference.
@@ -101,6 +120,46 @@ Veritas relies on pre-built vector indices for its RAG capabilities. Ensure you 
 ## Data Pipeline
 
 The `scripts/` directory houses the ETL (Extract, Transform, Load) pipelines responsible for creating the knowledge base:
+
+```mermaid
+graph LR
+    subgraph "Sources"
+        Congress[Congress.gov]
+        FedReg[Federal Register]
+        SCOTUS[Supreme Court DB]
+    end
+
+    subgraph "Extraction (Scripts)"
+        Scrape_Bills[bills.ipynb]
+        Scrape_Orders[orders_scraping.ipynb]
+        Scrape_Opinions[opinions_scraping.ipynb]
+    end
+
+    subgraph "Transformation"
+        Chunking[Chunking Notebooks]
+        Graph_Build[Graph Construction]
+    end
+
+    subgraph "Loading"
+        Embed[Embedding & Indexing]
+        Assets[(src/assets/)]
+    end
+
+    Congress --> Scrape_Bills
+    FedReg --> Scrape_Orders
+    SCOTUS --> Scrape_Opinions
+
+    Scrape_Bills --> Chunking
+    Scrape_Orders --> Chunking
+    Scrape_Opinions --> Chunking
+
+    Chunking --> Graph_Build
+    Chunking --> Embed
+    
+    Graph_Build --> Assets
+    Embed --> Assets
+```
+
 
 -   **Scraping**: Custom notebooks (`scripts/*/scraping.ipynb`) retrieve raw text from trusted sources:
     -   **Bills**: Scraped from Congress.gov.
