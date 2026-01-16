@@ -38,19 +38,26 @@ Veritas operates as a cohesive client-server application:
 
 ```mermaid
 graph TD
-    User[User] -->|Interacts| UI[Web Interface (Public/)]
-    UI -->|HTTP Request| Node[Node.js Server (server.js)]
+    User([User]) -->|HTTP/Browsing| UI["Web Interface (public/index.html)"]
+    UI -->|API Request| Node["Node.js Server (server.js)<br/>Port: 3000"]
     
-    subgraph "MCP Architecture"
-        Node -->|Calls| MCP_Client[MCP Client (MCPClientManager.js)]
-        MCP_Client <-->|Stdio Transport| MCP_Server[Python MCP Server (MCPServer.py)]
+    subgraph "MCP Backend System"
+        Node -->|"/api/mcp"| MCP_Client["MCP Client<br/>(MCPClientManager.js)"]
+        MCP_Client <-->|"Stdio Pipe<br/>(JSON-RPC)"| MCP_Server["Python MCP Server<br/>(src/MCPServer.py)"]
         
-        MCP_Server -->|Selects| Tools[Tools: search, verify, etc.]
-        Tools -->|Queries| Clients[Domain Clients (Bill, Order, Opinion)]
-        Tools -->|Inference| LLM[Groq LLM API]
+        MCP_Server -->|Router| ToolLogic{"Tool Selection"}
         
-        Clients <-->|Retrieves| VectorDB[(FAISS Indices & JSON)]
-        Clients <-->|Queries| KG[Knowledge Graphs]
+        ToolLogic -->|"search()"| Search["Search Logic"]
+        ToolLogic -->|"verify()"| Verify["Double-Verification<br/>(Vector + LLM)"]
+        ToolLogic -->|"choose_domain()"| Router["Domain Router"]
+        
+        Search -->|Queries| DomainMgr["Clients:<br/>BillClient, OrderClient, OpinionClient"]
+        
+        DomainMgr <-->|Retrieves| VectorDB[("Vector Indices<br/>(FAISS + .json)")]
+        DomainMgr <-->|Traverses| KG[("Knowledge Graphs<br/>(.gexf + NetworkX)")]
+        
+        Search -->|Context| LLM["LLM Inference<br/>(Groq Llama 3.3)"]
+        Verify -->|Quality Check| LLM
     end
 ```
 
@@ -123,41 +130,45 @@ The `scripts/` directory houses the ETL (Extract, Transform, Load) pipelines res
 
 ```mermaid
 graph LR
-    subgraph "Sources"
-        Congress[Congress.gov]
-        FedReg[Federal Register]
-        SCOTUS[Supreme Court DB]
+    subgraph "Data Acquisition"
+        Congress["Congress.gov<br/>(API)"]
+        FedReg["Federal Register<br/>(API)"]
+        SCOTUS["CourtListener<br/>(Database)"]
     end
 
-    subgraph "Extraction (Scripts)"
-        Scrape_Bills[bills.ipynb]
-        Scrape_Orders[orders_scraping.ipynb]
-        Scrape_Opinions[opinions_scraping.ipynb]
+    subgraph "ETL: Extraction & Transformation"
+        Script1["scripts/BILLS/bills.ipynb<br/>(Fetch & Parse XML)"]
+        Script2["scripts/EXECUTIVE_ORDERS/orders_scraping.ipynb<br/>(Fetch CSV/Text)"]
+        Script3["scripts/COURT_OPINIONS/opinions_scraping.ipynb<br/>(Fetch JSON)"]
+        
+        Processing["Chunking Logic<br/>(Semantic Segmentation)"]
     end
 
-    subgraph "Transformation"
-        Chunking[Chunking Notebooks]
-        Graph_Build[Graph Construction]
+    subgraph "Knowledge Engineering"
+        GraphBuild["Graph Construction<br/>(Entity Extraction/GLiNER)"]
+        Embed["Embedding Generation<br/>(SentenceTransformers)"]
     end
 
-    subgraph "Loading"
-        Embed[Embedding & Indexing]
-        Assets[(src/assets/)]
+    subgraph "Storage Assets"
+        Index[("Vector Indices<br/>(*.index)")]
+        Raw[("Metadata Stores<br/>(*.json)")]
+        Gexf[("Knowledge Graphs<br/>(*.gexf)")]
     end
 
-    Congress --> Scrape_Bills
-    FedReg --> Scrape_Orders
-    SCOTUS --> Scrape_Opinions
+    Congress --> Script1
+    FedReg --> Script2
+    SCOTUS --> Script3
 
-    Scrape_Bills --> Chunking
-    Scrape_Orders --> Chunking
-    Scrape_Opinions --> Chunking
+    Script1 --> Processing
+    Script2 --> Processing
+    Script3 --> Processing
 
-    Chunking --> Graph_Build
-    Chunking --> Embed
+    Processing --> GraphBuild
+    Processing --> Embed
     
-    Graph_Build --> Assets
-    Embed --> Assets
+    GraphBuild --> Gexf
+    Embed --> Index
+    Processing --> Raw
 ```
 
 
